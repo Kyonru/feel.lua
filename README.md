@@ -12,6 +12,8 @@ The core stays small and table-driven. LOVE-specific work lives in optional adap
 - Emits host-owned events for particles, camera shake, flashes, sounds, haptics, shaders, and more.
 - Runs steps in order, including waits, nested sequences, repeats, random branches, and parallel groups.
 
+https://github.com/user-attachments/assets/6b15a87f-5a11-42f6-922b-ccf8bd0627f7
+
 ## Install
 
 Install with Feather:
