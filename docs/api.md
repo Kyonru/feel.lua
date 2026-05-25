@@ -1,3 +1,7 @@
+---
+icon: lucide/book-open
+---
+
 # API
 
 ## `feel.target(meta)`

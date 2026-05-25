@@ -1,3 +1,7 @@
+---
+icon: lucide/list-tree
+---
+
 # Sequence Steps
 
 Each step is a table with a `kind`. Steps run in order unless a control-flow step changes how child steps are played.

@@ -1,3 +1,7 @@
+---
+icon: lucide/gamepad-2
+---
+
 # LOVE Adapter
 
 `feel.love` is an opt-in adapter for LOVE-specific side effects. It keeps the core runner small while giving LOVE apps convenient handlers for sound, haptics, particles, shaders, post-processing, camera, and screen feedback.

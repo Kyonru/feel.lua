@@ -1,3 +1,7 @@
+---
+icon: lucide/scan-heart
+---
+
 # feel.lua Docs
 
 `feel.lua` is split into a tiny core recipe runner and opt-in LOVE helpers. These docs group related features together so you can read the layer you are working in.

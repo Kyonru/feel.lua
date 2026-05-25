@@ -1,3 +1,7 @@
+---
+icon: lucide/rocket
+---
+
 # Getting Started
 
 Define feedback as small Lua tables, then play them from your game code.

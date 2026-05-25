@@ -1,3 +1,7 @@
+---
+icon: lucide/play
+---
+
 # LOVE Examples
 
 Run the showcase from the repository root:

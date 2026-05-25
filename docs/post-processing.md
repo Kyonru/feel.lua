@@ -1,3 +1,7 @@
+---
+icon: lucide/sparkles
+---
+
 # Post Processing
 
 `feel.love` includes a canvas-backed 2D post-processing pipeline. Wrap the scene you want processed with `fx:drawPost(drawScene)`.

@@ -1,3 +1,7 @@
+---
+icon: lucide/cpu
+---
+
 # Core Runner
 
 The core runner stores named feedback recipes, plays named or inline sequences, advances active work through `feel.update(dt)`, and leaves rendering or side effects to your app.
