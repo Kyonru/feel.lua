@@ -12,6 +12,11 @@ Adapter.__index = Adapter
 
 local DEFAULT_FLASH = { 1, 1, 1, 1 }
 local DEFAULT_FADE = { 0, 0, 0, 1 }
+local SOUND_SETTERS = {
+  volume = "setVolume",
+  pitch = "setPitch",
+  pan = "setPosition",
+}
 
 local function copyColor(color, fallback)
   color = color or fallback
@@ -48,8 +53,149 @@ local function drawOverlay(overlay)
   love.graphics.rectangle("fill", 0, 0, overlay.width, overlay.height)
 end
 
+local function isSourceList(value)
+  return type(value) == "table" and type(value.play) ~= "function" and #value > 0
+end
+
+local function collectSources(sourceOrSources)
+  if sourceOrSources == nil then
+    return {}
+  end
+  if isSourceList(sourceOrSources) then
+    local sources = {}
+    for _, source in ipairs(sourceOrSources) do
+      if source then
+        sources[#sources + 1] = source
+      end
+    end
+    return sources
+  end
+  return { sourceOrSources }
+end
+
+local function callSource(source, method, ...)
+  local fn = source and source[method]
+  if type(fn) == "function" then
+    fn(source, ...)
+  end
+end
+
+local function applySourceValue(source, name, value)
+  if value == nil then
+    return
+  end
+
+  if name == "pan" then
+    callSource(source, SOUND_SETTERS.pan, value, 0, 0)
+    return
+  end
+
+  callSource(source, SOUND_SETTERS[name], value)
+end
+
+local function applySoundValues(entry)
+  if not entry then
+    return
+  end
+
+  local values = entry.target.values
+  for _, source in ipairs(entry.sources) do
+    applySourceValue(source, "volume", values.volume)
+    applySourceValue(source, "pitch", values.pitch)
+    applySourceValue(source, "pan", values.pan)
+  end
+end
+
+local function selectedSource(entry)
+  if not entry or #entry.sources == 0 then
+    return nil
+  end
+  if #entry.sources == 1 then
+    return entry.sources[1]
+  end
+  return entry.sources[math.random(#entry.sources)]
+end
+
+local function setSoundValue(entry, name, value, duration, ease)
+  if not entry or value == nil then
+    return false
+  end
+
+  if not duration or duration <= 0 then
+    entry.target.values[name] = value
+    applySoundValues(entry)
+    return true
+  end
+
+  feel.play({
+    kind = "animate",
+    duration = duration,
+    ease = ease,
+    to = { [name] = value },
+    onUpdate = function()
+      applySoundValues(entry)
+    end,
+    onComplete = function()
+      applySoundValues(entry)
+    end,
+  }, entry.target)
+  return true
+end
+
+local function playSound(entry, payload)
+  local source = selectedSource(entry)
+  if not source then
+    return false
+  end
+
+  payload = payload or {}
+  setSoundValue(entry, "volume", payload.volume)
+  setSoundValue(entry, "pitch", payload.pitch)
+  setSoundValue(entry, "pan", payload.pan)
+
+  if entry.restart then
+    callSource(source, "stop")
+  end
+  applySoundValues(entry)
+  callSource(source, "play")
+  return true
+end
+
+local function stopSources(entry)
+  if not entry then
+    return false
+  end
+  for _, source in ipairs(entry.sources) do
+    callSource(source, "stop")
+  end
+  return true
+end
+
+local function pauseSources(entry)
+  if not entry then
+    return false
+  end
+  for _, source in ipairs(entry.sources) do
+    callSource(source, "pause")
+  end
+  return true
+end
+
+local function resumeSources(entry)
+  if not entry then
+    return false
+  end
+  for _, source in ipairs(entry.sources) do
+    callSource(source, "play")
+  end
+  return true
+end
+
 function Adapter:reset()
   feel.clear(self.cameraTarget)
+  for _, entry in pairs(self.soundEntries) do
+    feel.clear(entry.target)
+  end
 
   self.camera.x = self.defaults.x
   self.camera.y = self.defaults.y
@@ -75,6 +221,44 @@ function Adapter:reset()
   self.fade.duration = 0
   self.fade.remaining = 0
   self.fade.color = copyColor(nil, DEFAULT_FADE)
+end
+
+function Adapter:sound(name, sourceOrSources, opts)
+  if not name then
+    return self
+  end
+
+  opts = opts or {}
+  local target = feel.target()
+  target.values.volume = opts.volume ~= nil and opts.volume or 1
+  target.values.pitch = opts.pitch ~= nil and opts.pitch or 1
+  target.values.pan = opts.pan ~= nil and opts.pan or 0
+
+  self.soundEntries[name] = {
+    sources = collectSources(sourceOrSources),
+    restart = opts.restart ~= false,
+    target = target,
+  }
+  applySoundValues(self.soundEntries[name])
+  return self
+end
+
+function Adapter:sounds(map)
+  for name, sourceOrSources in pairs(map or {}) do
+    self:sound(name, sourceOrSources)
+  end
+  return self
+end
+
+function Adapter:stopSound(name)
+  return stopSources(self.soundEntries[name])
+end
+
+function Adapter:stopSounds()
+  for _, entry in pairs(self.soundEntries) do
+    stopSources(entry)
+  end
+  return true
 end
 
 function Adapter:update(dt)
@@ -177,9 +361,30 @@ function Adapter:emit(event, ctx)
     self.fade.alpha = 0
     self.fade.remaining = 0
     return true
+  elseif kind == "sound.play" then
+    return playSound(self.soundEntries[payload.cue], payload)
+  elseif kind == "sound.stop" then
+    if payload.cue then
+      return self:stopSound(payload.cue)
+    end
+    return self:stopSounds()
+  elseif kind == "sound.pause" then
+    return pauseSources(self.soundEntries[payload.cue])
+  elseif kind == "sound.resume" then
+    return resumeSources(self.soundEntries[payload.cue])
+  elseif kind == "sound.volume" then
+    return setSoundValue(self.soundEntries[payload.cue], "volume", payload.volume, payload.duration, payload.ease)
+  elseif kind == "sound.pitch" then
+    return setSoundValue(self.soundEntries[payload.cue], "pitch", payload.pitch, payload.duration, payload.ease)
+  elseif kind == "sound.pan" then
+    return setSoundValue(self.soundEntries[payload.cue], "pan", payload.pan, payload.duration, payload.ease)
   end
 
   return false, ctx
+end
+
+function Adapter:audio(event)
+  return playSound(self.soundEntries[event and event.cue], event)
 end
 
 function Adapter:handlers(extra)
@@ -193,6 +398,13 @@ function Adapter:handlers(extra)
     self:emit(event, ctx)
     if type(extra.emit) == "function" then
       extra.emit(event, ctx)
+    end
+  end
+
+  opts.audio = function(event, ctx)
+    self:audio(event)
+    if type(extra.audio) == "function" then
+      extra.audio(event, ctx)
     end
   end
 
@@ -267,6 +479,7 @@ function FeelLove.new(opts)
     shake = {},
     flash = {},
     fade = {},
+    soundEntries = {},
   }, Adapter)
 
   adapter:reset()

@@ -23,6 +23,15 @@ local feel = require("feel")
 
 The root `feel.lua` file is a small loader shim. The implementation lives in `feel/init.lua`, and `feel/vendor/flux.lua` is bundled.
 
+## Docs
+
+Feature guides live in [`docs/`](docs/):
+
+- [Core Runner](docs/core-runner.md)
+- [Sequence Steps](docs/sequence-steps.md)
+- [LOVE Adapter](docs/love-adapter.md)
+- [LOVE Examples](docs/love-examples.md)
+
 ## Quick Start
 
 ```lua
@@ -261,18 +270,24 @@ Run the demo from the repository root with LOVE:
 love examples/love2d
 ```
 
-The demo shows hover, press, launch, shake, flash, particle, beam, audio, and callback sequences.
+The showcase uses left and right arrows to move between feature scenes for the full feedback stack, sound controls, and camera/screen adapter behavior.
 
-## LOVE Camera + Screen Adapter
+## LOVE Sound, Camera + Screen Adapter
 
-`feel.love` is an optional LOVE2D adapter for camera and screen feedback. It handles camera/screen `emit` events, keeps the state, and gives you small draw helpers.
+`feel.love` is an optional LOVE2D adapter for sound, camera, and screen feedback. It plays registered audio cues, handles adapter `emit` events, keeps the state, and gives you small draw helpers.
 
 ```lua
 local feel = require("feel")
 local feelLove = require("feel.love")
 local fx = feelLove.new()
 
+fx:sounds({
+  hit = love.audio.newSource("hit.wav", "static"),
+  ui = love.audio.newSource("ui.wav", "static"),
+})
+
 feel.define("hit", {
+  { kind = "audio", cue = "hit" },
   { kind = "emit", event = "camera.shake", payload = { amount = 8, duration = 0.2 } },
   { kind = "emit", event = "screen.flash", payload = { amount = 0.35 } },
 })
@@ -294,13 +309,29 @@ function hit()
 end
 ```
 
-Supported adapter events are `camera.shake`, `camera.zoom`, `camera.move`, `camera.reset`, `screen.flash`, `screen.fade`, and `screen.clear`.
+Register one cue with `fx:sound(name, sourceOrSources, opts)` or many cues with `fx:sounds(map)`. A cue may be one LOVE `Source` or an array of alternate `Source`s. Playback restarts a selected source by default; pass `{ restart = false }` when registering a cue to let LOVE continue an already-playing source.
+
+`fx:handlers(extra)` plays `{ kind = "audio", cue = "hit" }` steps automatically, then calls `extra.audio(event, ctx)` if provided. Unknown cues are ignored by the adapter, so user callbacks can still handle them.
+
+Supported adapter events are `sound.play`, `sound.stop`, `sound.pause`, `sound.resume`, `sound.volume`, `sound.pitch`, `sound.pan`, `camera.shake`, `camera.zoom`, `camera.move`, `camera.reset`, `screen.flash`, `screen.fade`, and `screen.clear`.
+
+```lua
+feel.define("slow.hit", {
+  { kind = "emit", event = "sound.pitch", payload = { cue = "hit", pitch = 0.8, duration = 0.15 } },
+  { kind = "audio", cue = "hit" },
+  { kind = "emit", event = "sound.pitch", payload = { cue = "hit", pitch = 1, duration = 0.2 } },
+})
+```
+
+Timed sound controls let you author fades, ducking, pitch bends, and pan sweeps as regular sequences. See [LOVE Adapter](docs/love-adapter.md#sound-effect-recipes) for examples.
+
+Use `fx:stopSound(name)` to stop one cue and `fx:stopSounds()` to stop all registered cues.
 
 ## Design Direction
 
 `feel.lua` is LOVE-first, but the core should stay a tiny recipe runner. Current core primitives are `animate`, `emit`, `audio`, `callback`, `wait`, `play`, `parallel`, `repeat`, `random`, and `log`.
 
-Future LOVE-first helpers should build on those primitives instead of expanding into one component per effect. Good helper families include `sound`, `camera`, `screen`, `particle`, `text`, `sprite`, `time`, `spring`, and `shake`.
+LOVE-first helpers should build on those primitives instead of expanding the core into one component per effect. `sound`, `camera`, and `screen` are adapter-backed families today; good future helper families include `particle`, `text`, `sprite`, `time`, `spring`, and `shake`.
 
 For example, the LOVE adapter can translate this:
 
