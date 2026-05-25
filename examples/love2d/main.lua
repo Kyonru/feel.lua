@@ -1,6 +1,7 @@
 package.path = "?.lua;?/init.lua;../../?.lua;../../?/init.lua;" .. package.path
 
 local feel = require("feel")
+local feelLove = require("feel.love")
 
 local W, H = 1040, 680
 local buttons = {}
@@ -10,11 +11,10 @@ local logs = {}
 local sources = {}
 local pointer = { x = 0, y = 0 }
 local screen = {
-	shake = 0,
-	flash = 0,
 	heat = 0,
 	combo = 0,
 }
+local fx = feelLove.new()
 local selected = 1
 
 local palette = {
@@ -128,17 +128,13 @@ local function targetButton(label, subtitle, x, y, color, sequence)
 end
 
 local function playSequence(button, name, trigger)
-	feel.play(name, button.target, {
+	feel.play(name, button.target, fx:handlers({
 		trigger = trigger,
 		emit = function(event)
 			if event.kind == "burst" then
 				emitParticles(button.x + button.w / 2, button.y + button.h / 2, button.color, event.payload.count, event.payload.power)
 			elseif event.kind == "beam" then
 				emitBeam(button)
-			elseif event.kind == "shake" then
-				screen.shake = math.max(screen.shake, event.payload.amount)
-			elseif event.kind == "flash" then
-				screen.flash = math.max(screen.flash, event.payload.amount)
 			elseif event.kind == "heat" then
 				screen.heat = math.max(screen.heat, event.payload.amount)
 			end
@@ -149,7 +145,7 @@ local function playSequence(button, name, trigger)
 			addLog("audio:" .. event.cue)
 		end,
 		markDirty = function() end,
-	})
+	}))
 end
 
 local function defineSequences()
@@ -172,7 +168,7 @@ local function defineSequences()
 		{ kind = "audio", cue = "perfect" },
 		{ kind = "emit", event = "burst", payload = { count = 42, power = 260 } },
 		{ kind = "emit", event = "beam", payload = {} },
-		{ kind = "emit", event = "flash", payload = { amount = 0.58 } },
+		{ kind = "emit", event = "screen.flash", payload = { amount = 0.58 } },
 		{ kind = "animate", duration = 0.07, to = { scale = 1.18, rotation = -0.035, y = -10 }, ease = "quadout" },
 		{ kind = "animate", duration = 0.2, to = { scale = 1, scaleX = 1, scaleY = 1, rotation = 0, y = 0 }, ease = "backout" },
 		{
@@ -186,7 +182,7 @@ local function defineSequences()
 
 	feel.define("launch.overload", {
 		{ kind = "audio", cue = "overload" },
-		{ kind = "emit", event = "shake", payload = { amount = 12 } },
+		{ kind = "emit", event = "camera.shake", payload = { amount = 12, duration = 0.3 } },
 		{ kind = "emit", event = "heat", payload = { amount = 0.75 } },
 		{ kind = "animate", duration = 0.04, to = { x = -9, opacity = 0.78 }, ease = "quadout" },
 		{ kind = "animate", duration = 0.05, to = { x = 11, rotation = 0.04 }, ease = "quadout" },
@@ -205,7 +201,7 @@ local function defineSequences()
 
 	feel.define("launch.warning", {
 		{ kind = "audio", cue = "warn" },
-		{ kind = "emit", event = "shake", payload = { amount = 6 } },
+		{ kind = "emit", event = "camera.shake", payload = { amount = 6, duration = 0.18 } },
 		{ kind = "animate", duration = 0.055, to = { scaleX = 0.96, scaleY = 1.08, y = -7 }, ease = "quadout" },
 		{ kind = "emit", event = "burst", payload = { count = 14, power = 130 } },
 		{ kind = "animate", duration = 0.16, to = { scaleX = 1, scaleY = 1, y = 0 }, ease = "backout" },
@@ -250,8 +246,7 @@ end
 
 function love.update(dt)
 	feel.update(dt)
-	screen.shake = math.max(0, screen.shake - dt * 24)
-	screen.flash = math.max(0, screen.flash - dt * 2.6)
+	fx:update(dt)
 	screen.heat = math.max(0, screen.heat - dt * 0.9)
 
 	for i = #particles, 1, -1 do
@@ -353,11 +348,7 @@ local function drawLogPanel()
 end
 
 function love.draw()
-	local sx = screen.shake > 0 and math.sin(love.timer.getTime() * 82) * screen.shake or 0
-	local sy = screen.shake > 0 and math.cos(love.timer.getTime() * 73) * screen.shake * 0.55 or 0
-
-	love.graphics.push()
-	love.graphics.translate(sx, sy)
+	fx:push()
 	drawBackground()
 
 	color(palette.text)
@@ -375,12 +366,9 @@ function love.draw()
 		drawButton(button, i)
 	end
 	drawLogPanel()
-	love.graphics.pop()
+	fx:pop()
 
-	if screen.flash > 0 then
-		color({ 1, 1, 1, 1 }, screen.flash)
-		love.graphics.rectangle("fill", 0, 0, W, H)
-	end
+	fx:drawOverlay()
 end
 
 function love.mousemoved(x, y)
@@ -438,9 +426,8 @@ function love.keypressed(key)
 		playSequence(button, button.sequence, "activate")
 	elseif key == "r" then
 		screen.combo = 0
-		screen.shake = 0
-		screen.flash = 0
 		screen.heat = 0
+		fx:reset()
 		particles = {}
 		beams = {}
 		logs = {}

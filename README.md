@@ -263,19 +263,52 @@ love examples/love2d
 
 The demo shows hover, press, launch, shake, flash, particle, beam, audio, and callback sequences.
 
+## LOVE Camera + Screen Adapter
+
+`feel.love` is an optional LOVE2D adapter for camera and screen feedback. It handles camera/screen `emit` events, keeps the state, and gives you small draw helpers.
+
+```lua
+local feel = require("feel")
+local feelLove = require("feel.love")
+local fx = feelLove.new()
+
+feel.define("hit", {
+  { kind = "emit", event = "camera.shake", payload = { amount = 8, duration = 0.2 } },
+  { kind = "emit", event = "screen.flash", payload = { amount = 0.35 } },
+})
+
+function love.update(dt)
+  feel.update(dt)
+  fx:update(dt)
+end
+
+function love.draw()
+  fx:push()
+  drawWorld()
+  fx:pop()
+  fx:drawOverlay()
+end
+
+function hit()
+  feel.play("hit", nil, fx:handlers())
+end
+```
+
+Supported adapter events are `camera.shake`, `camera.zoom`, `camera.move`, `camera.reset`, `screen.flash`, `screen.fade`, and `screen.clear`.
+
 ## Design Direction
 
 `feel.lua` is LOVE-first, but the core should stay a tiny recipe runner. Current core primitives are `animate`, `emit`, `audio`, `callback`, `wait`, `play`, `parallel`, `repeat`, `random`, and `log`.
 
 Future LOVE-first helpers should build on those primitives instead of expanding into one component per effect. Good helper families include `sound`, `camera`, `screen`, `particle`, `text`, `sprite`, `time`, `spring`, and `shake`.
 
-For example, a future camera helper might translate this:
+For example, the LOVE adapter can translate this:
 
 ```lua
 { kind = "emit", event = "camera.shake", payload = { amount = 8, duration = 0.2 } }
 ```
 
-into whichever camera object or draw transform your LOVE game uses.
+into draw-time camera motion through `fx:push()` and `fx:pop()`.
 
 ## Tests
 
