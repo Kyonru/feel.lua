@@ -7,7 +7,167 @@ end
 
 local flux = require(prefix .. ".vendor.flux")
 
+---@class FeelModule
+---@field flux table
+---@field fields string[]
+---@field normalizeStep fun(step: FeelStepInput): FeelStep?
+---@field normalizeSequence fun(value: FeelSequenceInput): FeelStep[]?
+---@field target fun(meta?: FeelTargetMeta): FeelTarget
+---@field define fun(name: string, sequence: FeelSequenceInput): FeelStep[]?
+---@field get fun(name: string): FeelStep[]?
+---@field play fun(nameOrSequence: FeelSequenceInput, target?: FeelTarget, opts?: FeelPlayOptions): FeelContext?
+---@field update fun(dt?: number): boolean
+---@field clear fun(target?: FeelTarget)
 local Feel = {}
+
+---@class FeelTargetMeta
+---@field values? table<string, number>
+---@field [string] any
+
+---@class FeelTarget
+---@field values table<string, number>
+---@field [string] any
+
+---@class FeelContext
+---@field target? FeelTarget
+---@field trigger string
+---@field source any
+---@field opts FeelPlayOptions
+---@field runner FeelRunner
+
+---@class FeelPlayOptions
+---@field trigger? string
+---@field emit? fun(event: FeelEvent, ctx: FeelContext)
+---@field audio? fun(event: FeelAudioEvent, ctx: FeelContext)
+---@field log? fun(message: string, ctx: FeelContext)
+---@field markDirty? fun(ctx: FeelContext)
+---@field [string] any
+
+---@class FeelEvent
+---@field kind string
+---@field name? string
+---@field trigger string
+---@field target? FeelTarget
+---@field payload? any
+---@field step FeelStep
+---@field [string] any
+
+---@class FeelAudioEvent
+---@field cue string
+---@field kind string
+---@field target? FeelTarget
+---@field trigger string
+---@field step FeelStep
+
+---@class FeelRunner
+---@field ctx FeelContext
+---@field sequence FeelStep[]
+---@field index integer
+---@field done? fun(ctx?: FeelContext)
+---@field children FeelRunner[]
+---@field parent? FeelRunner
+---@field wait? FeelWaitState
+---@field cancelled? boolean
+
+---@class FeelWaitState
+---@field remaining number
+---@field nextStep fun()
+
+---@class FeelAnimateStep
+---@field kind "animate"
+---@field to? table<string, number>
+---@field from? table<string, number>
+---@field duration? number
+---@field ease? string
+---@field delay? number
+---@field onStart? fun(values: table<string, number>, ctx: FeelContext)
+---@field onUpdate? fun(values: table<string, number>, ctx: FeelContext)
+---@field onComplete? fun(values: table<string, number>, ctx: FeelContext)
+
+---@class FeelWaitStep
+---@field kind "wait"|"pause"
+---@field duration? number
+---@field time? number
+
+---@class FeelEmitStep
+---@field kind "emit"
+---@field event? string
+---@field name? string
+---@field payload? any
+---@field [string] any
+
+---@class FeelAudioStep
+---@field kind "audio"
+---@field cue string
+---@field audioKind? string
+
+---@class FeelCallbackStep
+---@field kind "callback"
+---@field callback? fun(ctx: FeelContext)
+---@field fn? fun(ctx: FeelContext)
+---@field [integer] any
+
+---@class FeelPlayStep
+---@field kind "play"
+---@field name? string
+---@field sequence? FeelSequenceInput
+---@field steps? FeelSequenceInput
+---@field step? FeelSequenceInput
+---@field feedback? FeelSequenceInput
+---@field target? FeelTarget
+---@field trigger? string
+---@field opts? FeelPlayOptions
+---@field [integer] any
+
+---@class FeelParallelStep
+---@field kind "parallel"
+---@field steps? FeelSequenceInput[]
+---@field sequences? FeelSequenceInput[]
+---@field target? FeelTarget
+---@field trigger? string
+---@field opts? FeelPlayOptions
+---@field [integer] any
+
+---@class FeelRepeatStep
+---@field kind "repeat"
+---@field count? integer
+---@field times? integer
+---@field forever? boolean
+---@field name? string
+---@field sequence? FeelSequenceInput
+---@field steps? FeelSequenceInput
+---@field step? FeelSequenceInput
+---@field feedback? FeelSequenceInput
+---@field target? FeelTarget
+---@field trigger? string
+---@field opts? FeelPlayOptions
+---@field [integer] any
+
+---@class FeelRandomOption
+---@field weight? number
+---@field chance? number
+---@field step? FeelSequenceInput
+---@field sequence? FeelSequenceInput
+---@field steps? FeelSequenceInput
+---@field [integer] any
+
+---@class FeelRandomStep
+---@field kind "random"
+---@field options? FeelRandomOption[]
+---@field target? FeelTarget
+---@field trigger? string
+---@field opts? FeelPlayOptions
+---@field [integer] any
+
+---@class FeelLogStep
+---@field kind "log"
+---@field message? string
+---@field text? string
+---@field [integer] any
+
+---@alias FeelStep FeelAnimateStep|FeelWaitStep|FeelEmitStep|FeelAudioStep|FeelCallbackStep|FeelPlayStep|FeelParallelStep|FeelRepeatStep|FeelRandomStep|FeelLogStep|table
+---@alias FeelStepInput FeelStep|fun(ctx: FeelContext)|string|number|boolean|nil
+---@alias FeelSequenceInput string|FeelStepInput|FeelStepInput[]|nil|false
 
 local group = flux.group()
 local registry = {}
@@ -543,6 +703,8 @@ runSequence = function(nameOrSequence, target, opts, done, meta)
   return ctx
 end
 
+---@param meta? FeelTargetMeta
+---@return FeelTarget
 function Feel.target(meta)
   meta = meta or {}
   local target = {}
@@ -559,16 +721,25 @@ function Feel.target(meta)
   return target
 end
 
+---@param name string
+---@param sequence FeelSequenceInput
+---@return FeelStep[]?
 function Feel.define(name, sequence)
   local normalized = normalizeSequence(sequence)
   registry[name] = normalized
   return normalized
 end
 
+---@param name string
+---@return FeelStep[]?
 function Feel.get(name)
   return registry[name]
 end
 
+---@param nameOrSequence FeelSequenceInput
+---@param target? FeelTarget
+---@param opts? FeelPlayOptions
+---@return FeelContext?
 function Feel.play(nameOrSequence, target, opts)
   if nameOrSequence == nil or nameOrSequence == false then
     return nil
@@ -577,6 +748,8 @@ function Feel.play(nameOrSequence, target, opts)
   return runSequence(nameOrSequence, target, opts)
 end
 
+---@param dt? number
+---@return boolean
 function Feel.update(dt)
   dt = dt or 0
   local hadActive = #group > 0 or #runners > 0
@@ -616,6 +789,8 @@ local function clearTarget(target)
   end
 end
 
+---@param target? FeelTarget
+---@return nil
 function Feel.clear(target)
   if target then
     clearTarget(target)

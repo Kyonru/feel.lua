@@ -6,9 +6,159 @@ end
 
 local feel = require(prefix)
 
+---@class FeelLoveModule
+---@field new fun(opts?: FeelLoveOptions): FeelLoveAdapter
 local FeelLove = {}
+
+---@class FeelLoveAdapter
+---@field opts FeelLoveOptions
+---@field defaults FeelLoveDefaults
+---@field cameraTarget table
+---@field camera table<string, number>
+---@field shake table<string, number>
+---@field flash table
+---@field fade table
+---@field soundEntries table<string, FeelLoveSoundEntry>
+---@field hapticEntries table<string, FeelLoveHapticEntry>
+---@field particleEntries table<string, FeelLoveParticleEntry>
+---@field particleOrder string[]
+---@field shaderEntries table<string, FeelLoveShaderEntry>
+---@field shaderStack table[]
+---@field activeShader? any
+---@field post FeelLovePostState
 local Adapter = {}
 Adapter.__index = Adapter
+
+---@class FeelLoveOptions
+---@field width? number
+---@field height? number
+---@field x? number
+---@field y? number
+---@field scale? number
+---@field rotation? number
+---@field duration? number
+---@field shakeAmount? number
+---@field shakeDuration? number
+---@field shakeFrequency? number
+---@field flashAmount? number
+---@field flashDuration? number
+---@field fadeAmount? number
+---@field fadeDuration? number
+---@field hapticDuration? number
+
+---@class FeelLoveDefaults
+---@field x number
+---@field y number
+---@field scale number
+---@field rotation number
+---@field shakeAmount number
+---@field shakeDuration number
+---@field shakeFrequency number
+---@field flashAmount number
+---@field flashDuration number
+---@field fadeAmount number
+---@field fadeDuration number
+---@field tweenDuration number
+---@field hapticDuration number
+
+---@class FeelLoveSourceLike
+---@field play? fun(self: FeelLoveSourceLike)
+---@field stop? fun(self: FeelLoveSourceLike)
+---@field pause? fun(self: FeelLoveSourceLike)
+---@field setVolume? fun(self: FeelLoveSourceLike, value: number)
+---@field setPitch? fun(self: FeelLoveSourceLike, value: number)
+---@field setPosition? fun(self: FeelLoveSourceLike, x: number, y: number, z: number)
+
+---@class FeelLoveSoundOptions
+---@field restart? boolean
+---@field volume? number
+---@field pitch? number
+---@field pan? number
+
+---@class FeelLoveSoundEntry
+---@field sources FeelLoveSourceLike[]
+---@field restart boolean
+---@field target table
+
+---@class FeelLoveJoystickLike
+---@field isVibrationSupported? fun(self: FeelLoveJoystickLike): boolean
+---@field setVibration? fun(self: FeelLoveJoystickLike, left?: number, right?: number, duration?: number)
+
+---@class FeelLoveHapticOptions
+---@field duration? number
+
+---@class FeelLoveHapticEntry
+---@field name string
+---@field joysticks FeelLoveJoystickLike[]
+---@field duration? number
+
+---@class FeelLoveParticleSystemLike
+---@field emit? fun(self: FeelLoveParticleSystemLike, count: number)
+---@field start? fun(self: FeelLoveParticleSystemLike)
+---@field stop? fun(self: FeelLoveParticleSystemLike)
+---@field reset? fun(self: FeelLoveParticleSystemLike)
+---@field update? fun(self: FeelLoveParticleSystemLike, dt: number)
+---@field setPosition? fun(self: FeelLoveParticleSystemLike, x: number, y: number)
+
+---@class FeelLoveParticleOptions
+---@field x? number
+---@field y? number
+
+---@class FeelLoveParticleEntry
+---@field name string
+---@field system FeelLoveParticleSystemLike
+
+---@class FeelLoveParticleBulkEntry
+---@field name? string
+---@field system? FeelLoveParticleSystemLike
+---@field opts? FeelLoveParticleOptions
+---@field options? FeelLoveParticleOptions
+---@field [integer] any
+
+---@class FeelLoveShaderLike
+---@field send? fun(self: FeelLoveShaderLike, uniform: string, value: any)
+
+---@class FeelLoveShaderOptions
+---@field uniforms? table<string, any>
+---@field values? table<string, any>
+
+---@class FeelLoveShaderEntry
+---@field name string
+---@field shader FeelLoveShaderLike
+---@field target table
+---@field values table<string, any>
+
+---@alias FeelLovePostEffectName '"bloom"'|'"chromatic"'|'"grade"'|'"lens"'|'"vignette"'|'"volume"'
+
+---@class FeelLovePostEffect
+---@field name FeelLovePostEffectName
+---@field defaults table<string, number>
+---@field enabled boolean
+---@field target table
+
+---@class FeelLovePostState
+---@field effects table<FeelLovePostEffectName, FeelLovePostEffect>
+---@field canvases table<string, any>
+---@field shaders table<string, FeelLoveShaderLike>
+---@field width? number
+---@field height? number
+
+---@class FeelLovePostTweenOptions
+---@field duration? number
+---@field ease? string
+
+---@class FeelLoveEvent
+---@field kind? string
+---@field event? string
+---@field name? string
+---@field cue? string
+---@field payload? table
+
+---@class FeelLoveHandlers
+---@field emit? fun(event: FeelLoveEvent, ctx?: any)
+---@field audio? fun(event: FeelLoveEvent, ctx?: any)
+
+---@alias FeelLoveDrawCallback fun()
 
 local DEFAULT_FLASH = { 1, 1, 1, 1 }
 local DEFAULT_FADE = { 0, 0, 0, 1 }
@@ -19,7 +169,7 @@ local SOUND_SETTERS = {
 }
 local POST_DEFAULTS = {
   bloom = { intensity = 0, threshold = 0.75, softness = 0.15 },
-  chromatic = { force = 0 },
+  chromatic = { force = 0, x = 0, y = 0 },
   grade = { exposure = 0, saturation = 1, hueShift = 0, contrast = 1 },
   lens = { distortion = 0 },
   vignette = { intensity = 0, radius = 0.75, softness = 0.35 },
@@ -33,6 +183,7 @@ extern number hueShift;
 extern number contrast;
 extern number lensDistortion;
 extern number chromaticForce;
+extern vec2 chromaticOffset;
 extern number vignetteIntensity;
 extern number vignetteRadius;
 extern number vignetteSoftness;
@@ -48,7 +199,7 @@ vec4 effect(vec4 color, Image tex, vec2 uv, vec2 screen)
   vec2 centered = uv - vec2(0.5);
   number r2 = dot(centered, centered);
   vec2 warped = uv + centered * r2 * lensDistortion;
-  vec2 ca = centered * chromaticForce * 0.012;
+  vec2 ca = centered * chromaticForce * 0.012 + chromaticOffset;
 
   vec4 sample = Texel(tex, warped);
   sample.r = Texel(tex, warped + ca).r;
@@ -646,6 +797,7 @@ local function sendGeneralPostUniforms(adapter, shader)
   sendShader(shader, "contrast", grade.contrast or 1)
   sendShader(shader, "lensDistortion", lens.distortion or 0)
   sendShader(shader, "chromaticForce", chromatic.force or 0)
+  sendShader(shader, "chromaticOffset", { chromatic.x or 0, chromatic.y or 0 })
   sendShader(shader, "vignetteIntensity", vignette.intensity or 0)
   sendShader(shader, "vignetteRadius", vignette.radius or 0.75)
   sendShader(shader, "vignetteSoftness", vignette.softness or 0.35)
@@ -703,6 +855,7 @@ local function tweenPostValues(adapter, effect, values, opts)
   return true
 end
 
+---@return nil
 function Adapter:reset()
   feel.clear(self.cameraTarget)
   for _, entry in pairs(self.soundEntries) do
@@ -743,6 +896,10 @@ function Adapter:reset()
   self.fade.color = copyColor(nil, DEFAULT_FADE)
 end
 
+---@param name string
+---@param sourceOrSources? FeelLoveSourceLike|FeelLoveSourceLike[]
+---@param opts? FeelLoveSoundOptions
+---@return FeelLoveAdapter
 function Adapter:sound(name, sourceOrSources, opts)
   if not name then
     return self
@@ -763,6 +920,8 @@ function Adapter:sound(name, sourceOrSources, opts)
   return self
 end
 
+---@param map? table<string, FeelLoveSourceLike|FeelLoveSourceLike[]>
+---@return FeelLoveAdapter
 function Adapter:sounds(map)
   for name, sourceOrSources in pairs(map or {}) do
     self:sound(name, sourceOrSources)
@@ -770,10 +929,13 @@ function Adapter:sounds(map)
   return self
 end
 
+---@param name string
+---@return boolean
 function Adapter:stopSound(name)
   return stopSources(self.soundEntries[name])
 end
 
+---@return boolean
 function Adapter:stopSounds()
   for _, entry in pairs(self.soundEntries) do
     stopSources(entry)
@@ -781,6 +943,10 @@ function Adapter:stopSounds()
   return true
 end
 
+---@param name string
+---@param joystickOrJoysticks? FeelLoveJoystickLike|FeelLoveJoystickLike[]
+---@param opts? FeelLoveHapticOptions
+---@return FeelLoveAdapter
 function Adapter:haptic(name, joystickOrJoysticks, opts)
   if not name then
     return self
@@ -795,6 +961,8 @@ function Adapter:haptic(name, joystickOrJoysticks, opts)
   return self
 end
 
+---@param map? table<string, FeelLoveJoystickLike|FeelLoveJoystickLike[]>
+---@return FeelLoveAdapter
 function Adapter:haptics(map)
   for name, joystickOrJoysticks in pairs(map or {}) do
     self:haptic(name, joystickOrJoysticks)
@@ -802,10 +970,13 @@ function Adapter:haptics(map)
   return self
 end
 
+---@param name string
+---@return boolean
 function Adapter:stopHaptic(name)
   return stopHapticEntry(self.hapticEntries[name])
 end
 
+---@return boolean
 function Adapter:stopHaptics()
   for _, entry in pairs(self.hapticEntries) do
     stopHapticEntry(entry)
@@ -813,10 +984,16 @@ function Adapter:stopHaptics()
   return true
 end
 
+---@param duration? number
+---@return boolean
 function Adapter:vibrate(duration)
   return vibrateSystem(duration)
 end
 
+---@param name string
+---@param system? FeelLoveParticleSystemLike
+---@param opts? FeelLoveParticleOptions
+---@return FeelLoveAdapter
 function Adapter:particle(name, system, opts)
   if not name then
     return self
@@ -835,6 +1012,8 @@ function Adapter:particle(name, system, opts)
   return self
 end
 
+---@param map? table<string, FeelLoveParticleSystemLike>|FeelLoveParticleBulkEntry[]
+---@return FeelLoveAdapter
 function Adapter:particles(map)
   map = map or {}
   for _, entry in ipairs(map) do
@@ -850,6 +1029,10 @@ function Adapter:particles(map)
   return self
 end
 
+---@param name string
+---@param shader? FeelLoveShaderLike
+---@param opts? FeelLoveShaderOptions
+---@return FeelLoveAdapter
 function Adapter:shader(name, shader, opts)
   if not name then
     return self
@@ -876,6 +1059,8 @@ function Adapter:shader(name, shader, opts)
   return self
 end
 
+---@param map? table<string, FeelLoveShaderLike>
+---@return FeelLoveAdapter
 function Adapter:shaders(map)
   for name, shader in pairs(map or {}) do
     self:shader(name, shader)
@@ -883,6 +1068,8 @@ function Adapter:shaders(map)
   return self
 end
 
+---@param name string
+---@return boolean
 function Adapter:pushShader(name)
   local entry = shaderEntry(self, name)
   if not entry or not love or not love.graphics or not love.graphics.setShader then
@@ -899,6 +1086,7 @@ function Adapter:pushShader(name)
   return true
 end
 
+---@return boolean
 function Adapter:popShader()
   if not love or not love.graphics or not love.graphics.setShader then
     return false
@@ -912,14 +1100,23 @@ function Adapter:popShader()
   return true
 end
 
+---@param effect FeelLovePostEffectName
+---@param values table<string, any>
+---@return boolean
 function Adapter:setPost(effect, values)
   return setPostValues(self, effect, values)
 end
 
+---@param effect FeelLovePostEffectName
+---@param values table<string, any>
+---@param opts? FeelLovePostTweenOptions
+---@return boolean
 function Adapter:tweenPost(effect, values, opts)
   return tweenPostValues(self, effect, values, opts)
 end
 
+---@param effect FeelLovePostEffectName
+---@return boolean
 function Adapter:enablePost(effect)
   local entry = postEffect(self, effect)
   if not entry then
@@ -929,6 +1126,8 @@ function Adapter:enablePost(effect)
   return true
 end
 
+---@param effect FeelLovePostEffectName
+---@return boolean
 function Adapter:disablePost(effect)
   local entry = postEffect(self, effect)
   if not entry then
@@ -938,6 +1137,7 @@ function Adapter:disablePost(effect)
   return true
 end
 
+---@return boolean
 function Adapter:clearPost()
   for _, entry in pairs(self.post.effects) do
     resetPostEffect(entry)
@@ -945,6 +1145,8 @@ function Adapter:clearPost()
   return true
 end
 
+---@param dt? number
+---@return nil
 function Adapter:update(dt)
   dt = dt or 0
 
@@ -984,6 +1186,10 @@ function Adapter:update(dt)
   end
 end
 
+---@param event? FeelLoveEvent
+---@param ctx? any
+---@return boolean
+---@return any ctx
 function Adapter:emit(event, ctx)
   local kind = event and (event.kind or event.event or event.name)
   local payload = event and event.payload or {}
@@ -1141,10 +1347,14 @@ function Adapter:emit(event, ctx)
   return false, ctx
 end
 
+---@param event? FeelLoveEvent
+---@return boolean
 function Adapter:audio(event)
   return playSound(self.soundEntries[event and event.cue], event)
 end
 
+---@param extra? FeelLoveHandlers
+---@return FeelLoveHandlers
 function Adapter:handlers(extra)
   extra = extra or {}
   local opts = {}
@@ -1169,6 +1379,7 @@ function Adapter:handlers(extra)
   return opts
 end
 
+---@return nil
 function Adapter:push()
   if not love or not love.graphics then
     return
@@ -1188,12 +1399,14 @@ function Adapter:push()
   end
 end
 
+---@return nil
 function Adapter:pop()
   if love and love.graphics and love.graphics.pop then
     love.graphics.pop()
   end
 end
 
+---@return nil
 function Adapter:drawOverlay()
   local width, height = viewportSize(self.opts)
   self.flash.width = width
@@ -1205,6 +1418,7 @@ function Adapter:drawOverlay()
   drawOverlay(self.flash)
 end
 
+---@return nil
 function Adapter:drawParticles()
   if not love or not love.graphics or not love.graphics.draw then
     return
@@ -1220,6 +1434,8 @@ function Adapter:drawParticles()
   end
 end
 
+---@param drawScene FeelLoveDrawCallback
+---@return boolean
 function Adapter:drawPost(drawScene)
   if type(drawScene) ~= "function" then
     return false
@@ -1287,6 +1503,8 @@ function Adapter:drawPost(drawScene)
   return true
 end
 
+---@param opts? FeelLoveOptions
+---@return FeelLoveAdapter
 function FeelLove.new(opts)
   opts = opts or {}
   local cameraTarget = feel.target({

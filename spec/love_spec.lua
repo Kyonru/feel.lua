@@ -407,11 +407,15 @@ describe("feel.love", function()
     local fx = feelLove.new()
 
     fx:emit({ kind = "post.tween", payload = { effect = "grade", values = { saturation = 0.4, contrast = 1.5 }, duration = 0.1 } })
+    fx:emit({ kind = "post.tween", payload = { effect = "chromatic", values = { x = 0.012, y = -0.006 }, duration = 0.1 } })
     feel.update(0.1)
 
     assert.is_true(fx.post.effects.grade.enabled)
     assert.are.equal(0.4, fx.post.effects.grade.target.values.saturation)
     assert.are.equal(1.5, fx.post.effects.grade.target.values.contrast)
+    assert.is_true(fx.post.effects.chromatic.enabled)
+    assert.are.equal(0.012, fx.post.effects.chromatic.target.values.x)
+    assert.are.equal(-0.006, fx.post.effects.chromatic.target.values.y)
   end)
 
   it("drawPost captures and renders through post resources", function()
@@ -419,6 +423,7 @@ describe("feel.love", function()
     local drew = false
 
     fx:setPost("vignette", { intensity = 0.8 })
+    fx:setPost("chromatic", { force = 1, x = 0.012, y = -0.006 })
     calls = {}
     local result = fx:drawPost(function()
       drew = true
@@ -432,6 +437,14 @@ describe("feel.love", function()
     assert.is_true(countCalls("setCanvas") > 0)
     assert.is_true(countCalls("setShader") > 0)
     assert.is_true(countCalls("draw") > 0)
+
+    local offset
+    for _, call in ipairs(calls) do
+      if call[1] == "send" and call[3] == "chromaticOffset" then
+        offset = call[4]
+      end
+    end
+    assert.are.same({ 0.012, -0.006 }, offset)
   end)
 
   it("drawPost falls back to direct drawing without canvas or shader support", function()

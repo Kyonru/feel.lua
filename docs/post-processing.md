@@ -19,7 +19,7 @@ The pipeline is a LOVE adapter feature, so recipes use normal `emit` steps.
 
 ```lua
 { kind = "emit", event = "post.set", payload = { effect = "bloom", values = { intensity = 0.8 } } }
-{ kind = "emit", event = "post.tween", payload = { effect = "chromatic", values = { force = 1 }, duration = 0.12 } }
+{ kind = "emit", event = "post.tween", payload = { effect = "chromatic", values = { force = 1, x = 0.012, y = -0.006 }, duration = 0.12 } }
 { kind = "emit", event = "post.weight", payload = { value = 0.5, duration = 0.2 } }
 { kind = "emit", event = "post.clear" }
 ```
@@ -35,13 +35,15 @@ The pipeline is a LOVE adapter feature, so recipes use normal `emit` steps.
 | Effect | Parameters |
 | --- | --- |
 | `bloom` | `intensity`, `threshold`, `softness` |
-| `chromatic` | `force` |
+| `chromatic` | `force`, `x`, `y` |
 | `grade` | `exposure`, `saturation`, `hueShift`, `contrast` |
 | `lens` | `distortion` |
 | `vignette` | `intensity`, `radius`, `softness` |
 | `volume` | `weight`, controlled through `post.weight` |
 
 Processing order is fixed: color grade, lens distortion, chromatic aberration, bloom, vignette, then global weight blend.
+
+Chromatic `x` and `y` are normalized screen-space offsets. Small values like `0.006` to `0.015` are usually enough for a visible channel split.
 
 ## Recipes
 
@@ -60,9 +62,9 @@ Chromatic hit:
 
 ```lua
 feel.define("impact.chromatic", {
-  { kind = "emit", event = "post.tween", payload = { effect = "chromatic", values = { force = 1 }, duration = 0.06 } },
+  { kind = "emit", event = "post.tween", payload = { effect = "chromatic", values = { force = 1, x = 0.012, y = -0.006 }, duration = 0.06 } },
   { kind = "wait", duration = 0.08 },
-  { kind = "emit", event = "post.tween", payload = { effect = "chromatic", values = { force = 0 }, duration = 0.22 } },
+  { kind = "emit", event = "post.tween", payload = { effect = "chromatic", values = { force = 0, x = 0, y = 0 }, duration = 0.22 } },
 })
 ```
 

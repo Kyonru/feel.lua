@@ -30,29 +30,56 @@ end
 local function defineSequences()
 	feel.define("post.bloom", {
 		{ kind = "emit", event = "post.set", payload = { effect = "bloom", values = { intensity = 0.25, threshold = 0.52, softness = 0.18 } } },
-		{ kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 1.15 }, duration = 0.12, ease = "quadout" } },
+		{ kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 2 }, duration = 0.12, ease = "quadout" } },
 		{ kind = "audio", cue = "bloom" },
 		{ kind = "wait", duration = 0.16 },
-		{ kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 0.38 }, duration = 0.42, ease = "quadout" } },
+		{ kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 0 }, duration = 0.42, ease = "quadout" } },
 		{
 			kind = "callback",
 			callback = function()
-				pulse(shared.palette.cyan)
+		pulse(shared.palette.cyan)
 			end,
 		},
 	})
 
 	feel.define("post.chromatic", {
 		{ kind = "emit", event = "post.set", payload = { effect = "chromatic", values = { force = 0 } } },
-		{ kind = "emit", event = "post.tween", payload = { effect = "chromatic", values = { force = 1 }, duration = 0.08, ease = "quadout" } },
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = {
+				effect = "chromatic",
+				values = { force = 1, x = 0.012, y = -0.006 },
+				duration = 0.08,
+				ease = "quadout",
+			},
+		},
 		{ kind = "emit", event = "camera.shake", payload = { amount = 4, duration = 0.12 } },
 		{ kind = "audio", cue = "hit" },
 		{ kind = "wait", duration = 0.08 },
-		{ kind = "emit", event = "post.tween", payload = { effect = "chromatic", values = { force = 0 }, duration = 0.24, ease = "quadout" } },
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = { effect = "chromatic", values = { force = 0, x = 0, y = 0 }, duration = 0.24, ease = "quadout" },
+		},
 	})
 
 	feel.define("post.grade", {
-		{ kind = "emit", event = "post.tween", payload = { effect = "grade", values = { exposure = 0.18, saturation = 1.35, hueShift = 0.06, contrast = 1.16 }, duration = 0.28, ease = "quadout" } },
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = {
+				effect = "grade",
+				values = {
+					exposure = 1,
+					saturation = 1.2,
+					hueShift = love.math.random(0, 1),
+					contrast = 0.5,
+				},
+				duration = 0.5,
+				ease = "quadout",
+			},
+		},
 		{ kind = "audio", cue = "grade" },
 		{
 			kind = "callback",
@@ -60,13 +87,24 @@ local function defineSequences()
 				pulse(shared.palette.gold)
 			end,
 		},
+		{ kind = "wait", duration = 5 },
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = {
+				effect = "grade",
+				values = { exposure = 1, saturation = 1, hueShift = 0.21, contrast = 0.4 },
+				duration = 0.5,
+				ease = "quadout",
+			},
+		},
 	})
 
 	feel.define("post.lens", {
-		{ kind = "emit", event = "post.tween", payload = { effect = "lens", values = { distortion = 0.36 }, duration = 0.18, ease = "quadout" } },
+		{ kind = "emit", event = "post.tween", payload = { effect = "lens", values = { distortion = 2 }, duration = 0.5, ease = "quadout" } },
 		{ kind = "audio", cue = "lens" },
 		{ kind = "wait", duration = 0.12 },
-		{ kind = "emit", event = "post.tween", payload = { effect = "lens", values = { distortion = 0.08 }, duration = 0.3, ease = "quadout" } },
+		{ kind = "emit", event = "post.tween", payload = { effect = "lens", values = { distortion = 0 }, duration = 0.3, ease = "quadout" } },
 	})
 
 	feel.define("post.vignette", {
