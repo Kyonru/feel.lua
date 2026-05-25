@@ -270,11 +270,11 @@ Run the demo from the repository root with LOVE:
 love examples/love2d
 ```
 
-The showcase uses left and right arrows to move between feature scenes for the full feedback stack, sound controls, particles, shaders, haptics, and camera/screen adapter behavior.
+The showcase uses left and right arrows to move between feature scenes for the full feedback stack, sound controls, particles, shaders, post-processing, haptics, and camera/screen adapter behavior.
 
 ## LOVE Adapter
 
-`feel.love` is an optional LOVE2D adapter for sound, haptics, particles, shaders, camera, and screen feedback. It plays registered audio cues, handles controller rumble and system vibration, updates and draws registered particle systems, sends shader uniforms, handles adapter `emit` events, keeps the state, and gives you small draw helpers.
+`feel.love` is an optional LOVE2D adapter for sound, haptics, particles, shaders, post-processing, camera, and screen feedback. It plays registered audio cues, handles controller rumble and system vibration, updates and draws registered particle systems, sends shader uniforms, applies canvas-backed post effects, handles adapter `emit` events, keeps the state, and gives you small draw helpers.
 
 ```lua
 local feel = require("feel")
@@ -313,7 +313,7 @@ Register one cue with `fx:sound(name, sourceOrSources, opts)` or many cues with 
 
 `fx:handlers(extra)` plays `{ kind = "audio", cue = "hit" }` steps automatically, then calls `extra.audio(event, ctx)` if provided. Unknown cues are ignored by the adapter, so user callbacks can still handle them.
 
-Supported adapter events are `sound.play`, `sound.stop`, `sound.pause`, `sound.resume`, `sound.volume`, `sound.pitch`, `sound.pan`, `haptic.play`, `haptic.stop`, `haptic.vibrate`, `particle.emit`, `particle.start`, `particle.stop`, `particle.reset`, `particle.move`, `shader.send`, `shader.tween`, `shader.apply`, `shader.clear`, `camera.shake`, `camera.zoom`, `camera.move`, `camera.reset`, `screen.flash`, `screen.fade`, and `screen.clear`.
+Supported adapter events are `sound.play`, `sound.stop`, `sound.pause`, `sound.resume`, `sound.volume`, `sound.pitch`, `sound.pan`, `haptic.play`, `haptic.stop`, `haptic.vibrate`, `particle.emit`, `particle.start`, `particle.stop`, `particle.reset`, `particle.move`, `shader.send`, `shader.tween`, `shader.apply`, `shader.clear`, `post.set`, `post.tween`, `post.enable`, `post.disable`, `post.weight`, `post.clear`, `camera.shake`, `camera.zoom`, `camera.move`, `camera.reset`, `screen.flash`, `screen.fade`, and `screen.clear`.
 
 ```lua
 feel.define("slow.hit", {
@@ -331,13 +331,15 @@ Registered LOVE `ParticleSystem`s can be controlled with `particle.emit`, `parti
 
 Registered LOVE `Shader`s can be controlled with `shader.send`, `shader.tween`, `shader.apply`, and `shader.clear`. See [LOVE Adapter](docs/love-adapter.md#shaders) for examples.
 
+Built-in post-processing effects can be controlled with `post.set`, `post.tween`, `post.weight`, and `post.clear`, then rendered with `fx:drawPost(function() drawWorld() end)`. See [Post Processing](docs/post-processing.md) for parameters and recipes.
+
 Use `fx:stopSound(name)` to stop one cue and `fx:stopSounds()` to stop all registered cues.
 
 ## Design Direction
 
 `feel.lua` is LOVE-first, but the core should stay a tiny recipe runner. Current core primitives are `animate`, `emit`, `audio`, `callback`, `wait`, `play`, `parallel`, `repeat`, `random`, and `log`.
 
-LOVE-first helpers should build on those primitives instead of expanding the core into one component per effect. `sound`, `haptic`, `particle`, `shader`, `camera`, and `screen` are adapter-backed families today; good future helper families include `text`, `sprite`, `time`, `spring`, and `shake`.
+LOVE-first helpers should build on those primitives instead of expanding the core into one component per effect. `sound`, `haptic`, `particle`, `shader`, `post`, `camera`, and `screen` are adapter-backed families today; good future helper families include `text`, `sprite`, `time`, `spring`, and `shake`.
 
 For example, the LOVE adapter can translate this:
 

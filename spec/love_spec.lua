@@ -110,6 +110,24 @@ describe("feel.love", function()
         getDimensions = function()
           return 320, 180
         end,
+        newCanvas = function(width, height)
+          local canvas = { width = width, height = height, id = "canvas-" .. tostring(#calls + 1) }
+          calls[#calls + 1] = { "newCanvas", width, height, canvas }
+          return canvas
+        end,
+        newShader = function(source)
+          local value = shader("post-" .. tostring(#calls + 1))
+          value.source = source
+          calls[#calls + 1] = { "newShader", source, value }
+          return value
+        end,
+        setCanvas = function(value)
+          _G.love.graphics.currentCanvas = value
+          calls[#calls + 1] = { "setCanvas", value }
+        end,
+        clear = function(r, g, b, a)
+          calls[#calls + 1] = { "clear", r, g, b, a }
+        end,
         push = function()
           calls[#calls + 1] = { "push" }
         end,
@@ -360,6 +378,94 @@ describe("feel.love", function()
 
     assert.are.same({ "setVibration", "p1", 0.4, 0.4, 0.12 }, calls[1])
     assert.are.same({ "haptic.play", "haptic.play", "haptic.unknown" }, seen)
+  end)
+
+  it("sets enables disables and clears post effects", function()
+    local fx = feelLove.new()
+
+    assert.is_true(fx:setPost("bloom", { intensity = 0.8, threshold = 0.6 }))
+    assert.is_true(fx.post.effects.bloom.enabled)
+    assert.are.equal(0.8, fx.post.effects.bloom.target.values.intensity)
+    assert.are.equal(0.6, fx.post.effects.bloom.target.values.threshold)
+
+    fx:emit({ kind = "post.disable", payload = { effect = "bloom" } })
+    assert.is_false(fx.post.effects.bloom.enabled)
+
+    fx:emit({ kind = "post.enable", payload = { effect = "bloom" } })
+    assert.is_true(fx.post.effects.bloom.enabled)
+
+    fx:emit({ kind = "post.weight", payload = { value = 0.4 } })
+    assert.are.equal(0.4, fx.post.effects.volume.target.values.weight)
+
+    fx:emit({ kind = "post.clear", payload = {} })
+    assert.is_false(fx.post.effects.bloom.enabled)
+    assert.are.equal(0, fx.post.effects.bloom.target.values.intensity)
+    assert.are.equal(1, fx.post.effects.volume.target.values.weight)
+  end)
+
+  it("tweens post effect values through feel.update", function()
+    local fx = feelLove.new()
+
+    fx:emit({ kind = "post.tween", payload = { effect = "grade", values = { saturation = 0.4, contrast = 1.5 }, duration = 0.1 } })
+    feel.update(0.1)
+
+    assert.is_true(fx.post.effects.grade.enabled)
+    assert.are.equal(0.4, fx.post.effects.grade.target.values.saturation)
+    assert.are.equal(1.5, fx.post.effects.grade.target.values.contrast)
+  end)
+
+  it("drawPost captures and renders through post resources", function()
+    local fx = feelLove.new()
+    local drew = false
+
+    fx:setPost("vignette", { intensity = 0.8 })
+    calls = {}
+    local result = fx:drawPost(function()
+      drew = true
+      calls[#calls + 1] = { "scene" }
+    end)
+
+    assert.is_true(result)
+    assert.is_true(drew)
+    assert.is_true(countCalls("newCanvas") > 0)
+    assert.is_true(countCalls("newShader") > 0)
+    assert.is_true(countCalls("setCanvas") > 0)
+    assert.is_true(countCalls("setShader") > 0)
+    assert.is_true(countCalls("draw") > 0)
+  end)
+
+  it("drawPost falls back to direct drawing without canvas or shader support", function()
+    local fx = feelLove.new()
+    local drew = false
+
+    _G.love.graphics.newCanvas = nil
+    fx:setPost("vignette", { intensity = 0.8 })
+    calls = {}
+    local result = fx:drawPost(function()
+      drew = true
+      calls[#calls + 1] = { "scene" }
+    end)
+
+    assert.is_false(result)
+    assert.is_true(drew)
+    assert.are.equal(0, countCalls("setCanvas"))
+  end)
+
+  it("post handlers still call extra emit callbacks", function()
+    local fx = feelLove.new()
+    local seen = {}
+
+    calls = {}
+    local handlers = fx:handlers({
+      emit = function(event)
+        seen[#seen + 1] = event.kind
+      end,
+    })
+    handlers.emit({ kind = "post.set", payload = { effect = "lens", values = { distortion = 0.35 } } })
+    handlers.emit({ kind = "post.unknown", payload = {} })
+
+    assert.are.equal(0.35, fx.post.effects.lens.target.values.distortion)
+    assert.are.same({ "post.set", "post.unknown" }, seen)
   end)
 
   it("registers particles and emits them with optional position", function()

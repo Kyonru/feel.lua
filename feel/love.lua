@@ -17,6 +17,105 @@ local SOUND_SETTERS = {
   pitch = "setPitch",
   pan = "setPosition",
 }
+local POST_DEFAULTS = {
+  bloom = { intensity = 0, threshold = 0.75, softness = 0.15 },
+  chromatic = { force = 0 },
+  grade = { exposure = 0, saturation = 1, hueShift = 0, contrast = 1 },
+  lens = { distortion = 0 },
+  vignette = { intensity = 0, radius = 0.75, softness = 0.35 },
+  volume = { weight = 1 },
+}
+local POST_ORDER = { "grade", "lens", "chromatic", "bloom", "vignette" }
+local POST_GENERAL_SHADER = [[
+extern number exposure;
+extern number saturation;
+extern number hueShift;
+extern number contrast;
+extern number lensDistortion;
+extern number chromaticForce;
+extern number vignetteIntensity;
+extern number vignetteRadius;
+extern number vignetteSoftness;
+
+vec3 shiftHue(vec3 color, number shift)
+{
+  number amount = abs(sin(shift * 3.1415926));
+  return mix(color, color.gbr, amount);
+}
+
+vec4 effect(vec4 color, Image tex, vec2 uv, vec2 screen)
+{
+  vec2 centered = uv - vec2(0.5);
+  number r2 = dot(centered, centered);
+  vec2 warped = uv + centered * r2 * lensDistortion;
+  vec2 ca = centered * chromaticForce * 0.012;
+
+  vec4 sample = Texel(tex, warped);
+  sample.r = Texel(tex, warped + ca).r;
+  sample.b = Texel(tex, warped - ca).b;
+
+  vec3 graded = sample.rgb * pow(2.0, exposure);
+  number luma = dot(graded, vec3(0.299, 0.587, 0.114));
+  graded = mix(vec3(luma), graded, saturation);
+  graded = shiftHue(graded, hueShift);
+  graded = (graded - vec3(0.5)) * contrast + vec3(0.5);
+
+  number dist = distance(uv, vec2(0.5));
+  number vignette = smoothstep(vignetteRadius, vignetteRadius - max(vignetteSoftness, 0.001), dist);
+  graded *= mix(1.0, vignette, vignetteIntensity);
+
+  return vec4(graded, sample.a) * color;
+}
+]]
+local POST_EXTRACT_SHADER = [[
+extern number threshold;
+extern number softness;
+
+vec4 effect(vec4 color, Image tex, vec2 uv, vec2 screen)
+{
+  vec4 pixel = Texel(tex, uv);
+  number bright = max(max(pixel.r, pixel.g), pixel.b);
+  number amount = smoothstep(threshold, threshold + max(softness, 0.001), bright);
+  return vec4(pixel.rgb * amount, pixel.a) * color;
+}
+]]
+local POST_BLUR_SHADER = [[
+extern vec2 direction;
+extern vec2 texel;
+
+vec4 effect(vec4 color, Image tex, vec2 uv, vec2 screen)
+{
+  vec2 stepv = direction * texel;
+  vec4 sum = Texel(tex, uv) * 0.227027;
+  sum += Texel(tex, uv + stepv * 1.384615) * 0.316216;
+  sum += Texel(tex, uv - stepv * 1.384615) * 0.316216;
+  sum += Texel(tex, uv + stepv * 3.230769) * 0.070270;
+  sum += Texel(tex, uv - stepv * 3.230769) * 0.070270;
+  return sum * color;
+}
+]]
+local POST_BLOOM_SHADER = [[
+extern Image bloomTex;
+extern number intensity;
+
+vec4 effect(vec4 color, Image tex, vec2 uv, vec2 screen)
+{
+  vec4 base = Texel(tex, uv);
+  vec4 bloom = Texel(bloomTex, uv) * intensity;
+  return vec4(base.rgb + bloom.rgb, base.a) * color;
+}
+]]
+local POST_WEIGHT_SHADER = [[
+extern Image processedTex;
+extern number weight;
+
+vec4 effect(vec4 color, Image tex, vec2 uv, vec2 screen)
+{
+  vec4 original = Texel(tex, uv);
+  vec4 processed = Texel(processedTex, uv);
+  return mix(original, processed, weight) * color;
+}
+]]
 
 local function copyColor(color, fallback)
   color = color or fallback
@@ -382,6 +481,228 @@ local function applyShader(adapter, entry)
   return true
 end
 
+local function copyValues(values)
+  local result = {}
+  for key, value in pairs(values or {}) do
+    result[key] = value
+  end
+  return result
+end
+
+local function newPostEffect(name, defaults)
+  local target = feel.target()
+  for key, value in pairs(defaults) do
+    target.values[key] = value
+  end
+  return {
+    name = name,
+    defaults = copyValues(defaults),
+    enabled = false,
+    target = target,
+  }
+end
+
+local function newPostState()
+  local effects = {}
+  for name, defaults in pairs(POST_DEFAULTS) do
+    effects[name] = newPostEffect(name, defaults)
+  end
+  effects.volume.enabled = true
+  return {
+    effects = effects,
+    canvases = {},
+    shaders = {},
+    width = nil,
+    height = nil,
+  }
+end
+
+local function resetPostEffect(entry)
+  if not entry then
+    return
+  end
+  feel.clear(entry.target)
+  for key, value in pairs(entry.defaults) do
+    entry.target.values[key] = value
+  end
+  entry.enabled = entry.name == "volume"
+end
+
+local function postEffect(adapter, effect)
+  return adapter.post and adapter.post.effects[effect]
+end
+
+local function postAvailable()
+  return love
+    and love.graphics
+    and love.graphics.newCanvas
+    and love.graphics.newShader
+    and love.graphics.setCanvas
+    and love.graphics.setShader
+    and love.graphics.draw
+end
+
+local function sendShader(shader, uniform, value)
+  callSource(shader, "send", uniform, value)
+end
+
+local function setCanvas(canvas)
+  if love and love.graphics and love.graphics.setCanvas then
+    love.graphics.setCanvas(canvas)
+  end
+end
+
+local function clearCanvas()
+  if love and love.graphics and love.graphics.clear then
+    love.graphics.clear(0, 0, 0, 0)
+  end
+end
+
+local function drawCanvas(canvas)
+  if love and love.graphics and love.graphics.draw then
+    love.graphics.draw(canvas, 0, 0)
+  end
+end
+
+local function white()
+  if love and love.graphics and love.graphics.setColor then
+    love.graphics.setColor(1, 1, 1, 1)
+  end
+end
+
+local function createPostShader(source)
+  if love and love.graphics and love.graphics.newShader then
+    return love.graphics.newShader(source)
+  end
+  return nil
+end
+
+local function ensurePostResources(adapter)
+  if not postAvailable() then
+    return false
+  end
+
+  local width, height = viewportSize(adapter.opts)
+  if width <= 0 or height <= 0 then
+    return false
+  end
+
+  local post = adapter.post
+  if post.width ~= width or post.height ~= height then
+    post.width = width
+    post.height = height
+    post.canvases = {
+      source = love.graphics.newCanvas(width, height),
+      workA = love.graphics.newCanvas(width, height),
+      workB = love.graphics.newCanvas(width, height),
+      bloomA = love.graphics.newCanvas(width, height),
+      bloomB = love.graphics.newCanvas(width, height),
+    }
+  end
+
+  if not post.shaders.general then
+    post.shaders.general = createPostShader(POST_GENERAL_SHADER)
+    post.shaders.extract = createPostShader(POST_EXTRACT_SHADER)
+    post.shaders.blur = createPostShader(POST_BLUR_SHADER)
+    post.shaders.bloom = createPostShader(POST_BLOOM_SHADER)
+    post.shaders.weight = createPostShader(POST_WEIGHT_SHADER)
+  end
+
+  return post.shaders.general and post.shaders.extract and post.shaders.blur and post.shaders.bloom and post.shaders.weight
+end
+
+local function anyPostEffectEnabled(post)
+  for _, name in ipairs(POST_ORDER) do
+    if post.effects[name].enabled then
+      return true
+    end
+  end
+  return false
+end
+
+local function renderPass(shader, input, output, configure)
+  setCanvas(output)
+  clearCanvas()
+  white()
+  love.graphics.setShader(shader)
+  if configure then
+    configure(shader)
+  end
+  drawCanvas(input)
+  love.graphics.setShader()
+  setCanvas()
+end
+
+local function sendGeneralPostUniforms(adapter, shader)
+  local effects = adapter.post.effects
+  local grade = effects.grade.enabled and effects.grade.target.values or effects.grade.defaults
+  local lens = effects.lens.enabled and effects.lens.target.values or effects.lens.defaults
+  local chromatic = effects.chromatic.enabled and effects.chromatic.target.values or effects.chromatic.defaults
+  local vignette = effects.vignette.enabled and effects.vignette.target.values or effects.vignette.defaults
+
+  sendShader(shader, "exposure", grade.exposure or 0)
+  sendShader(shader, "saturation", grade.saturation or 1)
+  sendShader(shader, "hueShift", grade.hueShift or 0)
+  sendShader(shader, "contrast", grade.contrast or 1)
+  sendShader(shader, "lensDistortion", lens.distortion or 0)
+  sendShader(shader, "chromaticForce", chromatic.force or 0)
+  sendShader(shader, "vignetteIntensity", vignette.intensity or 0)
+  sendShader(shader, "vignetteRadius", vignette.radius or 0.75)
+  sendShader(shader, "vignetteSoftness", vignette.softness or 0.35)
+end
+
+local function setPostValues(adapter, effect, values)
+  local entry = postEffect(adapter, effect)
+  if not entry or type(values) ~= "table" then
+    return false
+  end
+  for key, value in pairs(values) do
+    entry.target.values[key] = value
+  end
+  entry.enabled = true
+  return true
+end
+
+local function tweenPostValues(adapter, effect, values, opts)
+  local entry = postEffect(adapter, effect)
+  if not entry or type(values) ~= "table" then
+    return false
+  end
+
+  local to = {}
+  for key, value in pairs(values) do
+    if type(value) == "number" then
+      to[key] = value
+      if entry.target.values[key] == nil then
+        entry.target.values[key] = entry.defaults[key] or 0
+      end
+    else
+      entry.target.values[key] = value
+    end
+  end
+  entry.enabled = true
+
+  opts = opts or {}
+  if not opts.duration or opts.duration <= 0 then
+    for key, value in pairs(values) do
+      entry.target.values[key] = value
+    end
+    return true
+  end
+
+  if next(to) == nil then
+    return true
+  end
+
+  feel.play({
+    kind = "animate",
+    duration = opts.duration,
+    ease = opts.ease,
+    to = to,
+  }, entry.target)
+  return true
+end
+
 function Adapter:reset()
   feel.clear(self.cameraTarget)
   for _, entry in pairs(self.soundEntries) do
@@ -389,6 +710,9 @@ function Adapter:reset()
   end
   for _, entry in pairs(self.shaderEntries) do
     feel.clear(entry.target)
+  end
+  for _, entry in pairs(self.post.effects) do
+    resetPostEffect(entry)
   end
   self.shaderStack = {}
   self.activeShader = nil
@@ -588,6 +912,39 @@ function Adapter:popShader()
   return true
 end
 
+function Adapter:setPost(effect, values)
+  return setPostValues(self, effect, values)
+end
+
+function Adapter:tweenPost(effect, values, opts)
+  return tweenPostValues(self, effect, values, opts)
+end
+
+function Adapter:enablePost(effect)
+  local entry = postEffect(self, effect)
+  if not entry then
+    return false
+  end
+  entry.enabled = true
+  return true
+end
+
+function Adapter:disablePost(effect)
+  local entry = postEffect(self, effect)
+  if not entry then
+    return false
+  end
+  entry.enabled = false
+  return true
+end
+
+function Adapter:clearPost()
+  for _, entry in pairs(self.post.effects) do
+    resetPostEffect(entry)
+  end
+  return true
+end
+
 function Adapter:update(dt)
   dt = dt or 0
 
@@ -767,6 +1124,18 @@ function Adapter:emit(event, ctx)
       return true
     end
     return false
+  elseif kind == "post.set" then
+    return self:setPost(payload.effect, payload.values)
+  elseif kind == "post.tween" then
+    return self:tweenPost(payload.effect, payload.values, payload)
+  elseif kind == "post.enable" then
+    return self:enablePost(payload.effect)
+  elseif kind == "post.disable" then
+    return self:disablePost(payload.effect)
+  elseif kind == "post.weight" then
+    return self:tweenPost("volume", { weight = payload.value }, payload)
+  elseif kind == "post.clear" then
+    return self:clearPost()
   end
 
   return false, ctx
@@ -851,6 +1220,73 @@ function Adapter:drawParticles()
   end
 end
 
+function Adapter:drawPost(drawScene)
+  if type(drawScene) ~= "function" then
+    return false
+  end
+  if not anyPostEffectEnabled(self.post) and (self.post.effects.volume.target.values.weight or 1) >= 1 then
+    drawScene()
+    return true
+  end
+  if not ensurePostResources(self) then
+    drawScene()
+    return false
+  end
+
+  local post = self.post
+  local canvases = post.canvases
+  local shaders = post.shaders
+  local width = post.width
+  local height = post.height
+
+  setCanvas(canvases.source)
+  clearCanvas()
+  drawScene()
+  setCanvas()
+
+  local current = canvases.source
+  local nextCanvas = canvases.workA
+
+  renderPass(shaders.general, current, nextCanvas, function(shader)
+    sendGeneralPostUniforms(self, shader)
+  end)
+  current, nextCanvas = nextCanvas, canvases.workB
+
+  local bloom = post.effects.bloom
+  if bloom.enabled and (bloom.target.values.intensity or 0) > 0 then
+    renderPass(shaders.extract, current, canvases.bloomA, function(shader)
+      sendShader(shader, "threshold", bloom.target.values.threshold or 0.75)
+      sendShader(shader, "softness", bloom.target.values.softness or 0.15)
+    end)
+    renderPass(shaders.blur, canvases.bloomA, canvases.bloomB, function(shader)
+      sendShader(shader, "direction", { 1, 0 })
+      sendShader(shader, "texel", { 1 / width, 1 / height })
+    end)
+    renderPass(shaders.blur, canvases.bloomB, canvases.bloomA, function(shader)
+      sendShader(shader, "direction", { 0, 1 })
+      sendShader(shader, "texel", { 1 / width, 1 / height })
+    end)
+    renderPass(shaders.bloom, current, nextCanvas, function(shader)
+      sendShader(shader, "bloomTex", canvases.bloomA)
+      sendShader(shader, "intensity", bloom.target.values.intensity or 0)
+    end)
+    current, nextCanvas = nextCanvas, current == canvases.workA and canvases.workB or canvases.workA
+  end
+
+  white()
+  local weight = clamp01(self.post.effects.volume.target.values.weight, 1)
+  if weight < 1 then
+    love.graphics.setShader(shaders.weight)
+    sendShader(shaders.weight, "processedTex", current)
+    sendShader(shaders.weight, "weight", weight)
+    drawCanvas(canvases.source)
+    love.graphics.setShader()
+  else
+    drawCanvas(current)
+  end
+  return true
+end
+
 function FeelLove.new(opts)
   opts = opts or {}
   local cameraTarget = feel.target({
@@ -890,6 +1326,7 @@ function FeelLove.new(opts)
     particleOrder = {},
     shaderEntries = {},
     shaderStack = {},
+    post = newPostState(),
   }, Adapter)
 
   adapter:reset()

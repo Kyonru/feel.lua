@@ -1,6 +1,6 @@
 # LOVE Adapter
 
-`feel.love` is an opt-in adapter for LOVE-specific side effects. It keeps the core runner small while giving LOVE apps convenient handlers for sound, haptics, particles, shaders, camera, and screen feedback.
+`feel.love` is an opt-in adapter for LOVE-specific side effects. It keeps the core runner small while giving LOVE apps convenient handlers for sound, haptics, particles, shaders, post-processing, camera, and screen feedback.
 
 ```lua
 local feel = require("feel")
@@ -238,6 +238,32 @@ fx:pushShader("glow")
 drawActor()
 fx:popShader()
 ```
+
+## Post Processing
+
+Post-processing captures a draw callback into an adapter-owned canvas, applies built-in screen-space effects, and draws the final result.
+
+```lua
+function love.draw()
+  fx:drawPost(function()
+    drawWorld()
+  end)
+  fx:drawOverlay()
+end
+```
+
+Use `post.set` for immediate values, `post.tween` for timed parameter changes, and `post.weight` to blend between the original and processed scene.
+
+```lua
+feel.define("impact.bloom", {
+  { kind = "emit", event = "post.set", payload = { effect = "bloom", values = { threshold = 0.55 } } },
+  { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 1 }, duration = 0.12 } },
+  { kind = "wait", duration = 0.16 },
+  { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 0 }, duration = 0.35 } },
+})
+```
+
+Supported post events are `post.set`, `post.tween`, `post.enable`, `post.disable`, `post.weight`, and `post.clear`. Built-in effects are `bloom`, `chromatic`, `grade`, `lens`, and `vignette`; see [Post Processing](post-processing.md) for parameters and recipes.
 
 ## Camera And Screen
 
