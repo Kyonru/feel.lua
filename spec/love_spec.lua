@@ -62,6 +62,17 @@ describe("feel.love", function()
     }
   end
 
+  local function joystick(name, supported)
+    return {
+      isVibrationSupported = function()
+        return supported ~= false
+      end,
+      setVibration = function(_, left, right, duration)
+        calls[#calls + 1] = { "setVibration", name, left, right, duration }
+      end,
+    }
+  end
+
   local function countCalls(method)
     local count = 0
     for _, call in ipairs(calls) do
@@ -79,6 +90,15 @@ describe("feel.love", function()
       end
     end
     return false
+  end
+
+  local function findCall(method, name)
+    for _, call in ipairs(calls) do
+      if call[1] == method and call[2] == name then
+        return call
+      end
+    end
+    return nil
   end
 
   before_each(function()
@@ -120,6 +140,11 @@ describe("feel.love", function()
         end,
         getShader = function()
           return _G.love.graphics.currentShader
+        end,
+      },
+      system = {
+        vibrate = function(duration)
+          calls[#calls + 1] = { "vibrate", duration }
         end,
       },
     }
@@ -250,6 +275,91 @@ describe("feel.love", function()
     assert.are.same({ "setVolume", "hit", 0.25 }, calls[#calls - 2])
     assert.are.same({ "setPitch", "hit", 1.5 }, calls[#calls - 1])
     assert.are.same({ "setPosition", "hit", -0.4, 0, 0 }, calls[#calls])
+  end)
+
+  it("registers haptics and plays simple values across all targets", function()
+    local fx = feelLove.new()
+    local p1 = joystick("p1")
+    local p2 = joystick("p2")
+
+    fx:haptic("p1", p1)
+    fx:haptics({ p2 = p2 })
+    calls = {}
+    fx:emit({ kind = "haptic.play", payload = { value = 0.6, duration = 0.2 } })
+
+    assert.are.same({ "setVibration", "p1", 0.6, 0.6, 0.2 }, findCall("setVibration", "p1"))
+    assert.are.same({ "setVibration", "p2", 0.6, 0.6, 0.2 }, findCall("setVibration", "p2"))
+    assert.are.equal(2, countCalls("setVibration"))
+    assert.are.same({ "vibrate", 0.2 }, calls[#calls])
+  end)
+
+  it("targets named haptics and supports left right overrides", function()
+    local fx = feelLove.new()
+
+    fx:haptic("p1", joystick("p1"))
+    fx:haptic("p2", joystick("p2"), { duration = 0.3 })
+    calls = {}
+    fx:emit({ kind = "haptic.play", payload = { name = "p2", value = 0.25, left = 1.4, right = -0.2, system = false } })
+
+    assert.are.same({ "setVibration", "p2", 1, 0, 0.3 }, calls[1])
+    assert.are.equal(1, #calls)
+  end)
+
+  it("ignores unsupported haptic joysticks", function()
+    local fx = feelLove.new()
+
+    fx:haptic("p1", joystick("p1", false))
+    calls = {}
+    fx:emit({ kind = "haptic.play", payload = { name = "p1", value = 0.7, system = false } })
+
+    assert.are.equal(0, #calls)
+  end)
+
+  it("stops haptic targets and system vibration", function()
+    local fx = feelLove.new()
+
+    fx:haptic("p1", joystick("p1"))
+    fx:haptic("p2", { joystick("p2a"), joystick("p2b") })
+    calls = {}
+    fx:stopHaptic("p1")
+    fx:emit({ kind = "haptic.stop", payload = { name = "p2" } })
+    fx:stopHaptics()
+
+    assert.are.same({ "setVibration", "p1", nil, nil, nil }, calls[1])
+    assert.are.same({ "setVibration", "p2a", nil, nil, nil }, calls[2])
+    assert.are.same({ "setVibration", "p2b", nil, nil, nil }, calls[3])
+    assert.are.same({ "vibrate", 0 }, calls[4])
+    assert.are.equal(6, countCalls("setVibration"))
+  end)
+
+  it("can explicitly vibrate the system device", function()
+    local fx = feelLove.new()
+
+    calls = {}
+    fx:vibrate(0.15)
+    fx:emit({ kind = "haptic.vibrate", payload = { duration = 0.25 } })
+
+    assert.are.same({ "vibrate", 0.15 }, calls[1])
+    assert.are.same({ "vibrate", 0.25 }, calls[2])
+  end)
+
+  it("haptic handlers still call extra emit callbacks", function()
+    local fx = feelLove.new()
+    local seen = {}
+
+    fx:haptic("p1", joystick("p1"))
+    calls = {}
+    local handlers = fx:handlers({
+      emit = function(event)
+        seen[#seen + 1] = event.kind
+      end,
+    })
+    handlers.emit({ kind = "haptic.play", payload = { name = "p1", value = 0.4, system = false } })
+    handlers.emit({ kind = "haptic.play", payload = { name = "missing", value = 0.4, system = false } })
+    handlers.emit({ kind = "haptic.unknown", payload = {} })
+
+    assert.are.same({ "setVibration", "p1", 0.4, 0.4, 0.12 }, calls[1])
+    assert.are.same({ "haptic.play", "haptic.play", "haptic.unknown" }, seen)
   end)
 
   it("registers particles and emits them with optional position", function()

@@ -14,6 +14,7 @@ The showcase uses left and right arrows to move between feature scenes. Each sce
 - `scenes/sound_controls.lua`: registered LOVE cue alternates plus `sound.volume`, `sound.pitch`, and `sound.pan`.
 - `scenes/particles.lua`: registered LOVE `ParticleSystem`s driven by `particle.emit`, `particle.start`, `particle.stop`, `particle.reset`, and `particle.move`.
 - `scenes/shaders.lua`: registered LOVE `Shader`s driven by `shader.send`, `shader.tween`, `shader.apply`, and `shader.clear`.
+- `scenes/haptics.lua`: registered joystick rumble plus mobile/system vibration driven by `haptic.play`, `haptic.stop`, and `haptic.vibrate`.
 - `scenes/camera_screen.lua`: `camera.shake`, `camera.move`, `camera.zoom`, `camera.reset`, `screen.flash`, `screen.fade`, and `screen.clear`.
 
 ## Adding A Scene

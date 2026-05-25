@@ -9,6 +9,7 @@ local scenes = {
 	require("scenes.sound_controls"),
 	require("scenes.particles"),
 	require("scenes.shaders"),
+	require("scenes.haptics"),
 	require("scenes.camera_screen"),
 }
 

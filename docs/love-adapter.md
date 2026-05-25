@@ -1,6 +1,6 @@
 # LOVE Adapter
 
-`feel.love` is an opt-in adapter for LOVE-specific side effects. It keeps the core runner small while giving LOVE apps convenient handlers for sound, particles, shaders, camera, and screen feedback.
+`feel.love` is an opt-in adapter for LOVE-specific side effects. It keeps the core runner small while giving LOVE apps convenient handlers for sound, haptics, particles, shaders, camera, and screen feedback.
 
 ```lua
 local feel = require("feel")
@@ -102,6 +102,52 @@ feel.define("ui.sweep", {
   { kind = "emit", event = "sound.pan", payload = { cue = "ui", pan = 1, duration = 0.25, ease = "quadout" } },
   { kind = "wait", duration = 0.25 },
   { kind = "emit", event = "sound.pan", payload = { cue = "ui", pan = 0, duration = 0.15 } },
+})
+```
+
+## Haptics
+
+Register app-owned joysticks with `fx:haptic(name, joystickOrJoysticks, opts)` or `fx:haptics(map)`.
+
+```lua
+local pads = love.joystick.getJoysticks()
+fx:haptic("p1", pads[1])
+fx:haptic("p2", pads[2])
+```
+
+Use `haptic.play` for cross-platform feedback. By default it rumbles registered joystick targets and also calls `love.system.vibrate(duration)` when LOVE exposes system vibration.
+
+```lua
+feel.define("impact.rumble", {
+  { kind = "emit", event = "haptic.play", payload = { value = 0.6, duration = 0.18 } },
+})
+```
+
+`value` drives both motors. `left` and `right` override that value independently for controllers that support separate motors.
+
+```lua
+feel.define("impact.sweep", {
+  { kind = "emit", event = "haptic.play", payload = { left = 0.2, right = 0.9, duration = 0.22 } },
+})
+```
+
+For multiplayer games, include `name` to target one registered joystick. Pass `system = false` when a controller-only pulse should not also vibrate the mobile/system device.
+
+```lua
+feel.define("p1.damage", {
+  { kind = "emit", event = "haptic.play", payload = { name = "p1", value = 0.8, duration = 0.16, system = false } },
+})
+```
+
+Supported haptic events are `haptic.play`, `haptic.stop`, and `haptic.vibrate`. Use `fx:stopHaptic(name)` or `fx:stopHaptics()` for direct stop control.
+
+```lua
+feel.define("rumble.stop", {
+  { kind = "emit", event = "haptic.stop", payload = {} },
+})
+
+feel.define("mobile.vibrate", {
+  { kind = "emit", event = "haptic.vibrate", payload = { duration = 0.2 } },
 })
 ```
 

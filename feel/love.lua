@@ -73,6 +73,26 @@ local function collectSources(sourceOrSources)
   return { sourceOrSources }
 end
 
+local function isJoystickList(value)
+  return type(value) == "table" and type(value.setVibration) ~= "function" and #value > 0
+end
+
+local function collectJoysticks(joystickOrJoysticks)
+  if joystickOrJoysticks == nil then
+    return {}
+  end
+  if isJoystickList(joystickOrJoysticks) then
+    local joysticks = {}
+    for _, joystick in ipairs(joystickOrJoysticks) do
+      if joystick then
+        joysticks[#joysticks + 1] = joystick
+      end
+    end
+    return joysticks
+  end
+  return { joystickOrJoysticks }
+end
+
 local function callSource(source, method, ...)
   local fn = source and source[method]
   if type(fn) == "function" then
@@ -189,6 +209,75 @@ local function resumeSources(entry)
     callSource(source, "play")
   end
   return true
+end
+
+local function clamp01(value, fallback)
+  if value == nil then
+    value = fallback or 0
+  end
+  if value < 0 then
+    return 0
+  end
+  if value > 1 then
+    return 1
+  end
+  return value
+end
+
+local function supportsVibration(joystick)
+  local fn = joystick and joystick.isVibrationSupported
+  if type(fn) ~= "function" then
+    return true
+  end
+  return fn(joystick) == true
+end
+
+local function canSetVibration(joystick)
+  return type(joystick and joystick.setVibration) == "function" and supportsVibration(joystick)
+end
+
+local function vibrateSystem(duration)
+  if not love or not love.system or type(love.system.vibrate) ~= "function" then
+    return false
+  end
+  love.system.vibrate(duration)
+  return true
+end
+
+local function playHapticEntry(entry, payload, defaultDuration)
+  if not entry then
+    return false
+  end
+
+  payload = payload or {}
+  local value = payload.value ~= nil and payload.value or 1
+  local left = clamp01(payload.left, value)
+  local right = clamp01(payload.right, value)
+  local duration = payload.duration or entry.duration or defaultDuration
+  local played = false
+
+  for _, joystick in ipairs(entry.joysticks) do
+    if canSetVibration(joystick) then
+      callSource(joystick, "setVibration", left, right, duration)
+      played = true
+    end
+  end
+  return played
+end
+
+local function stopHapticEntry(entry)
+  if not entry then
+    return false
+  end
+
+  local stopped = false
+  for _, joystick in ipairs(entry.joysticks) do
+    if canSetVibration(joystick) then
+      callSource(joystick, "setVibration")
+      stopped = true
+    end
+  end
+  return stopped
 end
 
 local function setParticlePosition(entry, payload)
@@ -366,6 +455,42 @@ function Adapter:stopSounds()
     stopSources(entry)
   end
   return true
+end
+
+function Adapter:haptic(name, joystickOrJoysticks, opts)
+  if not name then
+    return self
+  end
+
+  opts = opts or {}
+  self.hapticEntries[name] = {
+    name = name,
+    joysticks = collectJoysticks(joystickOrJoysticks),
+    duration = opts.duration,
+  }
+  return self
+end
+
+function Adapter:haptics(map)
+  for name, joystickOrJoysticks in pairs(map or {}) do
+    self:haptic(name, joystickOrJoysticks)
+  end
+  return self
+end
+
+function Adapter:stopHaptic(name)
+  return stopHapticEntry(self.hapticEntries[name])
+end
+
+function Adapter:stopHaptics()
+  for _, entry in pairs(self.hapticEntries) do
+    stopHapticEntry(entry)
+  end
+  return true
+end
+
+function Adapter:vibrate(duration)
+  return vibrateSystem(duration)
 end
 
 function Adapter:particle(name, system, opts)
@@ -585,6 +710,37 @@ function Adapter:emit(event, ctx)
     return setSoundValue(self.soundEntries[payload.cue], "pitch", payload.pitch, payload.duration, payload.ease)
   elseif kind == "sound.pan" then
     return setSoundValue(self.soundEntries[payload.cue], "pan", payload.pan, payload.duration, payload.ease)
+  elseif kind == "haptic.play" then
+    local played = false
+    local systemDuration = payload.duration or self.defaults.hapticDuration
+    if payload.name then
+      local entry = self.hapticEntries[payload.name]
+      if entry then
+        systemDuration = payload.duration or entry.duration or self.defaults.hapticDuration
+      end
+      played = playHapticEntry(entry, payload, self.defaults.hapticDuration)
+    else
+      for _, entry in pairs(self.hapticEntries) do
+        played = playHapticEntry(entry, payload, self.defaults.hapticDuration) or played
+      end
+    end
+    if payload.system ~= false then
+      played = vibrateSystem(systemDuration) or played
+    end
+    return played
+  elseif kind == "haptic.stop" then
+    local stopped
+    if payload.name then
+      stopped = self:stopHaptic(payload.name)
+    else
+      stopped = self:stopHaptics()
+    end
+    if payload.system ~= false then
+      stopped = vibrateSystem(0) or stopped
+    end
+    return stopped
+  elseif kind == "haptic.vibrate" then
+    return vibrateSystem(payload.duration)
   elseif kind == "particle.emit" then
     return emitParticle(particleEntry(self, payload), payload)
   elseif kind == "particle.start" then
@@ -723,11 +879,13 @@ function FeelLove.new(opts)
       fadeAmount = opts.fadeAmount or 1,
       fadeDuration = opts.fadeDuration or 0.35,
       tweenDuration = opts.duration or 0.16,
+      hapticDuration = opts.hapticDuration or 0.12,
     },
     shake = {},
     flash = {},
     fade = {},
     soundEntries = {},
+    hapticEntries = {},
     particleEntries = {},
     particleOrder = {},
     shaderEntries = {},
