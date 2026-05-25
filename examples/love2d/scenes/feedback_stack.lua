@@ -18,10 +18,22 @@ local function addLog(text)
 	shared.log(logs, text, 8)
 end
 
-local function emitBeam(button)
+local function buttonCenter(button)
+	return button.x + button.w / 2, button.y + button.h / 2
+end
+
+local function effectOrigin(button, origin)
+	if origin and origin.x and origin.y then
+		return origin.x, origin.y
+	end
+	return buttonCenter(button)
+end
+
+local function emitBeam(button, origin)
+	local x, y = effectOrigin(button, origin)
 	beams[#beams + 1] = {
-		x = button.x + button.w / 2,
-		y = button.y + button.h / 2,
+		x = x,
+		y = y,
 		life = 0.28,
 		maxLife = 0.28,
 		color = button.color,
@@ -50,8 +62,8 @@ local function targetButton(label, subtitle, x, y, color, sequence)
 	return button
 end
 
-local function playSequence(button, name, trigger)
-	feel.play(name, button.target, fx:handlers({
+local function playSequence(button, name, trigger, origin)
+	local handlers = fx:handlers({
 		trigger = trigger,
 		emit = function(event)
 			if event.kind == "beam" then
@@ -65,7 +77,22 @@ local function playSequence(button, name, trigger)
 			addLog("audio:" .. event.cue)
 		end,
 		markDirty = function() end,
-	}))
+	})
+
+	handlers.emit = function(event, ctx)
+		if event.kind and event.kind:match("^particle%.") and event.payload and event.payload.fromButton then
+			event.payload.x, event.payload.y = effectOrigin(button, origin)
+		end
+		fx:emit(event, ctx)
+		if event.kind == "beam" then
+			emitBeam(button, origin)
+		elseif event.kind == "heat" then
+			screen.heat = math.max(screen.heat, event.payload.amount)
+		end
+		addLog("emit:" .. event.kind .. " trigger=" .. tostring(event.trigger))
+	end
+
+	feel.play(name, button.target, handlers)
 end
 
 local function defineSequences()
@@ -79,12 +106,17 @@ local function defineSequences()
 
 	feel.define("button.press", {
 		{ kind = "audio", cue = "press" },
+		{ kind = "emit", event = "particle.start", payload = { name = "press", fromButton = true } },
+		{ kind = "emit", event = "particle.emit", payload = { name = "press", count = 10, fromButton = true } },
+		{ kind = "emit", event = "particle.stop", payload = { name = "press" } },
 		{ kind = "animate", duration = 0.04, to = { scaleX = 1.07, scaleY = 0.9, y = 3 }, ease = "quadout" },
 	})
 
 	feel.define("launch.perfect", {
 		{ kind = "audio", cue = "perfect" },
-		{ kind = "emit", event = "particle.emit", payload = { name = "perfect", count = 42, x = 248.5, y = 278 } },
+		{ kind = "emit", event = "particle.start", payload = { name = "perfect", fromButton = true } },
+		{ kind = "emit", event = "particle.emit", payload = { name = "perfect", count = 52, fromButton = true } },
+		{ kind = "emit", event = "particle.stop", payload = { name = "perfect" } },
 		{ kind = "emit", event = "beam", payload = {} },
 		{ kind = "emit", event = "screen.flash", payload = { amount = 0.58 } },
 		{ kind = "animate", duration = 0.07, to = { scale = 1.18, rotation = -0.035, y = -10 }, ease = "quadout" },
@@ -101,6 +133,9 @@ local function defineSequences()
 	feel.define("launch.overload", {
 		{ kind = "audio", cue = "overload" },
 		{ kind = "emit", event = "camera.shake", payload = { amount = 12, duration = 0.3 } },
+		{ kind = "emit", event = "particle.start", payload = { name = "overload", fromButton = true } },
+		{ kind = "emit", event = "particle.emit", payload = { name = "overload", count = 36, fromButton = true } },
+		{ kind = "emit", event = "particle.stop", payload = { name = "overload" } },
 		{ kind = "emit", event = "heat", payload = { amount = 0.75 } },
 		{ kind = "animate", duration = 0.04, to = { x = -9, opacity = 0.78 }, ease = "quadout" },
 		{ kind = "animate", duration = 0.05, to = { x = 11, rotation = 0.04 }, ease = "quadout" },
@@ -113,7 +148,9 @@ local function defineSequences()
 		{ kind = "emit", event = "beam", payload = {} },
 		{ kind = "animate", duration = 0.08, to = { opacity = 0.35, x = 34, scale = 0.94 }, ease = "quadout" },
 		{ kind = "animate", duration = 0.1, to = { opacity = 1, x = -16, scale = 1.08 }, ease = "quadout" },
-		{ kind = "emit", event = "particle.emit", payload = { name = "phase", count = 20, x = 790.5, y = 278 } },
+		{ kind = "emit", event = "particle.start", payload = { name = "phase", fromButton = true } },
+		{ kind = "emit", event = "particle.emit", payload = { name = "phase", count = 28, fromButton = true } },
+		{ kind = "emit", event = "particle.stop", payload = { name = "phase" } },
 		{ kind = "animate", duration = 0.18, to = { x = 0, scale = 1 }, ease = "backout" },
 	})
 
@@ -121,7 +158,9 @@ local function defineSequences()
 		{ kind = "audio", cue = "warn" },
 		{ kind = "emit", event = "camera.shake", payload = { amount = 6, duration = 0.18 } },
 		{ kind = "animate", duration = 0.055, to = { scaleX = 0.96, scaleY = 1.08, y = -7 }, ease = "quadout" },
-		{ kind = "emit", event = "particle.emit", payload = { name = "warning", count = 14, x = 519.5, y = 398 } },
+		{ kind = "emit", event = "particle.start", payload = { name = "warning", fromButton = true } },
+		{ kind = "emit", event = "particle.emit", payload = { name = "warning", count = 24, fromButton = true } },
+		{ kind = "emit", event = "particle.stop", payload = { name = "warning" } },
 		{ kind = "animate", duration = 0.16, to = { scaleX = 1, scaleY = 1, y = 0 }, ease = "backout" },
 	})
 end
@@ -164,14 +203,16 @@ function Scene.load(ctx)
 		warn = shared.makeTone(260, 0.16, 0.18),
 	})
 	fx:particles({
+		{ name = "press", system = shared.makeParticleSystem(shared.palette.green, { speedMin = 80, speedMax = 180, gravity = 180, lifeMin = 0.18, lifeMax = 0.42, sizeStart = 1.3 }) },
 		{ name = "perfect", system = shared.makeParticleSystem(shared.palette.cyan, { speedMax = 310, gravity = 330 }) },
+		{ name = "overload", system = shared.makeParticleSystem(shared.palette.pink, { buffer = 384, speedMin = 180, speedMax = 430, gravity = 360, lifeMin = 0.28, lifeMax = 0.8, sizeStart = 2 }) },
 		{ name = "phase", system = shared.makeParticleSystem(shared.palette.violet, { speedMax = 240, gravity = 220 }) },
 		{ name = "warning", system = shared.makeParticleSystem(shared.palette.gold, { speedMax = 190, gravity = 300 }) },
 	})
 
 	defineSequences()
 	resetButtons()
-	addLog("feel.define: 6 sequences")
+	addLog("feel.define: particles + 7 sequences")
 end
 
 function Scene.update(ctx, dt)
@@ -245,7 +286,6 @@ local function drawEffects()
 		shared.color(beam.color, t * 0.22)
 		love.graphics.circle("fill", beam.x, beam.y, 80 * (1 - t) + 18)
 	end
-	fx:drawParticles()
 end
 
 function Scene.draw(ctx)
@@ -264,6 +304,7 @@ function Scene.draw(ctx)
 	for i, button in ipairs(buttons) do
 		drawButton(button, i)
 	end
+	fx:drawParticles()
 	shared.drawLogs(logs, 82, 494, 876, 126)
 	fx:pop()
 
@@ -292,7 +333,8 @@ function Scene.mousepressed(ctx, x, y, button)
 	if hit then
 		selected = index
 		hit.pressed = true
-		playSequence(hit, "button.press", "press")
+		hit.pressOrigin = { x = x, y = y }
+		playSequence(hit, "button.press", "press", hit.pressOrigin)
 	end
 end
 
@@ -306,8 +348,9 @@ function Scene.mousereleased(ctx, x, y, button)
 			candidate.pressed = false
 			feel.play("button.idle", candidate.target)
 			if candidate == hit then
-				playSequence(candidate, candidate.sequence, "activate")
+				playSequence(candidate, candidate.sequence, "activate", candidate.pressOrigin)
 			end
+			candidate.pressOrigin = nil
 		end
 	end
 end
