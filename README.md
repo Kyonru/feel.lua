@@ -1,8 +1,6 @@
 # feel.lua
 
-`feel.lua` is a tiny LOVE2D-first feedback sequencing library for making actions feel good. It wraps a vendored copy of [flux](https://github.com/rxi/flux) so you can describe game feel as small Lua recipes: animation, timing, emitted effects, audio cues, callbacks, random choices, loops, and grouped steps.
-
-The core stays small and table-driven. LOVE-specific work lives in optional adapters or user callbacks.
+`feel.lua` is a tiny LOVE2D-first feedback sequencing library for making actions feel good.
 
 ## What It Does
 
@@ -62,6 +60,12 @@ end
 - [LOVE Adapter](docs/love-adapter.md)
 - [Post Processing](docs/post-processing.md)
 - [LOVE Examples](docs/love-examples.md)
+
+## How does it work?
+
+It wraps a vendored copy of [flux](https://github.com/rxi/flux) by [rxi](https://github.com/rxi) so you can describe game feel as small Lua recipes: animation, timing, emitted effects, audio cues, callbacks, random choices, loops, and grouped steps.
+
+The core stays small and table-driven. LOVE-specific work lives in optional adapters or user callbacks.
 
 ## Tests
 
