@@ -8,7 +8,6 @@ local feelLove
 local shared
 local fx
 local buttons
-local particles
 local beams
 local logs
 local pointer
@@ -17,23 +16,6 @@ local screen
 
 local function addLog(text)
 	shared.log(logs, text, 8)
-end
-
-local function emitParticles(x, y, base, count, power)
-	for _ = 1, count do
-		local angle = math.random() * math.pi * 2
-		local speed = power * (0.35 + math.random() * 0.9)
-		particles[#particles + 1] = {
-			x = x,
-			y = y,
-			vx = math.cos(angle) * speed,
-			vy = math.sin(angle) * speed,
-			life = 0.4 + math.random() * 0.35,
-			maxLife = 0.75,
-			size = 3 + math.random() * 7,
-			color = shared.mixColor(base, { 1, 1, 1, 1 }, math.random() * 0.35),
-		}
-	end
 end
 
 local function emitBeam(button)
@@ -72,9 +54,7 @@ local function playSequence(button, name, trigger)
 	feel.play(name, button.target, fx:handlers({
 		trigger = trigger,
 		emit = function(event)
-			if event.kind == "burst" then
-				emitParticles(button.x + button.w / 2, button.y + button.h / 2, button.color, event.payload.count, event.payload.power)
-			elseif event.kind == "beam" then
+			if event.kind == "beam" then
 				emitBeam(button)
 			elseif event.kind == "heat" then
 				screen.heat = math.max(screen.heat, event.payload.amount)
@@ -104,7 +84,7 @@ local function defineSequences()
 
 	feel.define("launch.perfect", {
 		{ kind = "audio", cue = "perfect" },
-		{ kind = "emit", event = "burst", payload = { count = 42, power = 260 } },
+		{ kind = "emit", event = "particle.emit", payload = { name = "perfect", count = 42, x = 248.5, y = 278 } },
 		{ kind = "emit", event = "beam", payload = {} },
 		{ kind = "emit", event = "screen.flash", payload = { amount = 0.58 } },
 		{ kind = "animate", duration = 0.07, to = { scale = 1.18, rotation = -0.035, y = -10 }, ease = "quadout" },
@@ -133,7 +113,7 @@ local function defineSequences()
 		{ kind = "emit", event = "beam", payload = {} },
 		{ kind = "animate", duration = 0.08, to = { opacity = 0.35, x = 34, scale = 0.94 }, ease = "quadout" },
 		{ kind = "animate", duration = 0.1, to = { opacity = 1, x = -16, scale = 1.08 }, ease = "quadout" },
-		{ kind = "emit", event = "burst", payload = { count = 20, power = 190 } },
+		{ kind = "emit", event = "particle.emit", payload = { name = "phase", count = 20, x = 790.5, y = 278 } },
 		{ kind = "animate", duration = 0.18, to = { x = 0, scale = 1 }, ease = "backout" },
 	})
 
@@ -141,7 +121,7 @@ local function defineSequences()
 		{ kind = "audio", cue = "warn" },
 		{ kind = "emit", event = "camera.shake", payload = { amount = 6, duration = 0.18 } },
 		{ kind = "animate", duration = 0.055, to = { scaleX = 0.96, scaleY = 1.08, y = -7 }, ease = "quadout" },
-		{ kind = "emit", event = "burst", payload = { count = 14, power = 130 } },
+		{ kind = "emit", event = "particle.emit", payload = { name = "warning", count = 14, x = 519.5, y = 398 } },
 		{ kind = "animate", duration = 0.16, to = { scaleX = 1, scaleY = 1, y = 0 }, ease = "backout" },
 	})
 end
@@ -170,7 +150,6 @@ function Scene.load(ctx)
 	feelLove = ctx.feelLove
 	shared = ctx.shared
 	fx = feelLove.new()
-	particles = {}
 	beams = {}
 	logs = {}
 	pointer = { x = 0, y = 0 }
@@ -184,6 +163,11 @@ function Scene.load(ctx)
 		phase = shared.makeTone(680, 0.14, 0.18),
 		warn = shared.makeTone(260, 0.16, 0.18),
 	})
+	fx:particles({
+		{ name = "perfect", system = shared.makeParticleSystem(shared.palette.cyan, { speedMax = 310, gravity = 330 }) },
+		{ name = "phase", system = shared.makeParticleSystem(shared.palette.violet, { speedMax = 240, gravity = 220 }) },
+		{ name = "warning", system = shared.makeParticleSystem(shared.palette.gold, { speedMax = 190, gravity = 300 }) },
+	})
 
 	defineSequences()
 	resetButtons()
@@ -193,17 +177,6 @@ end
 function Scene.update(ctx, dt)
 	fx:update(dt)
 	screen.heat = math.max(0, screen.heat - dt * 0.9)
-
-	for i = #particles, 1, -1 do
-		local p = particles[i]
-		p.life = p.life - dt
-		p.x = p.x + p.vx * dt
-		p.y = p.y + p.vy * dt
-		p.vy = p.vy + 320 * dt
-		if p.life <= 0 then
-			table.remove(particles, i)
-		end
-	end
 
 	for i = #beams, 1, -1 do
 		local beam = beams[i]
@@ -272,12 +245,7 @@ local function drawEffects()
 		shared.color(beam.color, t * 0.22)
 		love.graphics.circle("fill", beam.x, beam.y, 80 * (1 - t) + 18)
 	end
-
-	for _, p in ipairs(particles) do
-		local t = math.max(0, p.life / p.maxLife)
-		shared.color(p.color, t)
-		love.graphics.circle("fill", p.x, p.y, p.size * t)
-	end
+	fx:drawParticles()
 end
 
 function Scene.draw(ctx)

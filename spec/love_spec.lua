@@ -30,6 +30,29 @@ describe("feel.love", function()
     }
   end
 
+  local function particle(name)
+    return {
+      setPosition = function(_, x, y)
+        calls[#calls + 1] = { "setPosition", name, x, y }
+      end,
+      emit = function(_, count)
+        calls[#calls + 1] = { "emit", name, count }
+      end,
+      start = function()
+        calls[#calls + 1] = { "start", name }
+      end,
+      stop = function()
+        calls[#calls + 1] = { "stop", name }
+      end,
+      reset = function()
+        calls[#calls + 1] = { "reset", name }
+      end,
+      update = function(_, dt)
+        calls[#calls + 1] = { "update", name, dt }
+      end,
+    }
+  end
+
   local function countCalls(method)
     local count = 0
     for _, call in ipairs(calls) do
@@ -78,6 +101,9 @@ describe("feel.love", function()
         end,
         rectangle = function(mode, x, y, w, h)
           calls[#calls + 1] = { "rectangle", mode, x, y, w, h }
+        end,
+        draw = function(system)
+          calls[#calls + 1] = { "draw", system }
         end,
       },
     }
@@ -208,6 +234,74 @@ describe("feel.love", function()
     assert.are.same({ "setVolume", "hit", 0.25 }, calls[#calls - 2])
     assert.are.same({ "setPitch", "hit", 1.5 }, calls[#calls - 1])
     assert.are.same({ "setPosition", "hit", -0.4, 0, 0 }, calls[#calls])
+  end)
+
+  it("registers particles and emits them with optional position", function()
+    local fx = feelLove.new()
+
+    fx:particle("spark", particle("spark"))
+    calls = {}
+    fx:emit({ kind = "particle.emit", payload = { name = "spark", count = 12, x = 20, y = 30 } })
+    fx:emit({ kind = "particle.emit", payload = { name = "spark" } })
+
+    assert.are.same({ "setPosition", "spark", 20, 30 }, calls[1])
+    assert.are.same({ "emit", "spark", 12 }, calls[2])
+    assert.are.same({ "emit", "spark", 1 }, calls[3])
+  end)
+
+  it("handles particle start stop reset and move events", function()
+    local fx = feelLove.new()
+
+    fx:particle("smoke", particle("smoke"))
+    calls = {}
+    fx:emit({ kind = "particle.start", payload = { name = "smoke", x = 1, y = 2 } })
+    fx:emit({ kind = "particle.move", payload = { name = "smoke", x = 3, y = 4 } })
+    fx:emit({ kind = "particle.stop", payload = { name = "smoke" } })
+    fx:emit({ kind = "particle.reset", payload = { name = "smoke" } })
+
+    assert.are.same({ "setPosition", "smoke", 1, 2 }, calls[1])
+    assert.are.same({ "start", "smoke" }, calls[2])
+    assert.are.same({ "setPosition", "smoke", 3, 4 }, calls[3])
+    assert.are.same({ "stop", "smoke" }, calls[4])
+    assert.are.same({ "reset", "smoke" }, calls[5])
+  end)
+
+  it("bulk registers particles, updates them, and draws in registration order", function()
+    local fx = feelLove.new()
+    local spark = particle("spark")
+    local smoke = particle("smoke")
+
+    fx:particles({
+      { name = "spark", system = spark },
+      { name = "smoke", system = smoke },
+    })
+    calls = {}
+    fx:update(0.2)
+    fx:drawParticles()
+
+    assert.are.same({ "update", "spark", 0.2 }, calls[1])
+    assert.are.same({ "update", "smoke", 0.2 }, calls[2])
+    assert.are.same({ "setColor", 1, 1, 1, 1 }, calls[3])
+    assert.are.same({ "draw", spark }, calls[4])
+    assert.are.same({ "draw", smoke }, calls[5])
+  end)
+
+  it("particle handlers still call extra emit callbacks", function()
+    local fx = feelLove.new()
+    local seen = {}
+
+    fx:particle("spark", particle("spark"))
+    calls = {}
+    local handlers = fx:handlers({
+      emit = function(event)
+        seen[#seen + 1] = event.kind
+      end,
+    })
+    handlers.emit({ kind = "particle.emit", payload = { name = "spark" } })
+    handlers.emit({ kind = "particle.emit", payload = { name = "missing" } })
+
+    assert.are.same({ "emit", "spark", 1 }, calls[1])
+    assert.are.same({ "particle.emit", "particle.emit" }, seen)
   end)
 
   it("update decays shake and flash over time", function()

@@ -1,4 +1,5 @@
 local Shared = {}
+Shared.particleImages = {}
 
 Shared.palette = {
 	bg = { 0.025, 0.028, 0.04, 1 },
@@ -64,6 +65,42 @@ function Shared.makeTone(frequency, duration, volume)
 		data:setSample(i, wave * (volume or 0.22) * fade)
 	end
 	return love.audio.newSource(data, "static")
+end
+
+function Shared.makeParticleSystem(base, opts)
+	if not love.image or not love.graphics or not love.graphics.newImage or not love.graphics.newParticleSystem then
+		return nil
+	end
+
+	opts = opts or {}
+	local size = opts.imageSize or 8
+	local data = love.image.newImageData(size, size)
+	for y = 0, size - 1 do
+		for x = 0, size - 1 do
+			local dx = (x + 0.5) / size * 2 - 1
+			local dy = (y + 0.5) / size * 2 - 1
+			local alpha = math.max(0, 1 - math.sqrt(dx * dx + dy * dy))
+			data:setPixel(x, y, 1, 1, 1, alpha)
+		end
+	end
+
+	local image = love.graphics.newImage(data)
+	Shared.particleImages[#Shared.particleImages + 1] = image
+
+	local system = love.graphics.newParticleSystem(image, opts.buffer or 256)
+	local gravity = opts.gravity or 260
+	system:setParticleLifetime(opts.lifeMin or 0.32, opts.lifeMax or 0.72)
+	system:setSpeed(opts.speedMin or 70, opts.speedMax or 260)
+	system:setLinearAcceleration(0, gravity, 0, gravity)
+	system:setSpread(opts.spread or math.pi * 2)
+	system:setSizes(opts.sizeStart or 1.3, opts.sizeEnd or 0)
+	if opts.spinMin or opts.spinMax then
+		system:setSpin(opts.spinMin or 0, opts.spinMax or 0)
+	end
+	system:setColors(base[1], base[2], base[3], base[4] or 1, base[1], base[2], base[3], 0)
+	system:setEmissionRate(opts.rate or 80)
+	system:stop()
+	return system
 end
 
 function Shared.drawLogs(logs, x, y, w, h)

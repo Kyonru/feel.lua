@@ -1,6 +1,6 @@
 # LOVE Adapter
 
-`feel.love` is an opt-in adapter for LOVE-specific side effects. It keeps the core runner small while giving LOVE apps convenient handlers for sound, camera, and screen feedback.
+`feel.love` is an opt-in adapter for LOVE-specific side effects. It keeps the core runner small while giving LOVE apps convenient handlers for sound, particles, camera, and screen feedback.
 
 ```lua
 local feel = require("feel")
@@ -105,6 +105,47 @@ feel.define("ui.sweep", {
 })
 ```
 
+## Particles
+
+Register app-created LOVE `ParticleSystem`s with `fx:particle(name, system, opts)` or `fx:particles(map)`.
+
+```lua
+local image = love.graphics.newImage("spark.png")
+local sparks = love.graphics.newParticleSystem(image, 256)
+sparks:setParticleLifetime(0.25, 0.7)
+sparks:setSpeed(80, 280)
+sparks:setSpread(math.pi * 2)
+sparks:setColors(0.1, 0.8, 1, 1, 0.1, 0.8, 1, 0)
+
+fx:particle("sparks", sparks)
+```
+
+Particle configuration stays on the LOVE `ParticleSystem`. The adapter only stores systems, updates them, draws them, and translates recipe events into system calls.
+
+```lua
+feel.define("hit.sparks", {
+  { kind = "emit", event = "particle.emit", payload = { name = "sparks", count = 24, x = 120, y = 80 } },
+})
+```
+
+Supported particle events are `particle.emit`, `particle.start`, `particle.stop`, `particle.reset`, and `particle.move`.
+
+```lua
+feel.define("fire.start", {
+  { kind = "emit", event = "particle.start", payload = { name = "fire", x = 420, y = 300 } },
+})
+
+feel.define("fire.move", {
+  { kind = "emit", event = "particle.move", payload = { name = "fire", x = 520, y = 320 } },
+})
+
+feel.define("fire.stop", {
+  { kind = "emit", event = "particle.stop", payload = { name = "fire" } },
+})
+```
+
+Call `fx:drawParticles()` where the systems should render. If particles should move with the camera adapter, draw them between `fx:push()` and `fx:pop()`.
+
 ## Camera And Screen
 
 Camera events mutate adapter-owned draw state. Wrap world drawing with `fx:push()` and `fx:pop()`.
@@ -122,4 +163,4 @@ Supported camera events are `camera.shake`, `camera.zoom`, `camera.move`, and `c
 
 Screen events draw overlays through `fx:drawOverlay()`. Supported screen events are `screen.flash`, `screen.fade`, and `screen.clear`.
 
-Call both `feel.update(dt)` and `fx:update(dt)` from `love.update(dt)`.
+Call both `feel.update(dt)` and `fx:update(dt)` from `love.update(dt)`. Adapter update advances camera/screen state and registered particle systems.

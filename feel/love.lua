@@ -191,6 +191,54 @@ local function resumeSources(entry)
   return true
 end
 
+local function setParticlePosition(entry, payload)
+  if not entry or not payload then
+    return
+  end
+  if payload.x ~= nil and payload.y ~= nil then
+    callSource(entry.system, "setPosition", payload.x, payload.y)
+  end
+end
+
+local function particleEntry(adapter, payload)
+  return adapter.particleEntries[payload and payload.name]
+end
+
+local function emitParticle(entry, payload)
+  if not entry then
+    return false
+  end
+  payload = payload or {}
+  setParticlePosition(entry, payload)
+  callSource(entry.system, "emit", payload.count or 1)
+  return true
+end
+
+local function startParticle(entry, payload)
+  if not entry then
+    return false
+  end
+  setParticlePosition(entry, payload)
+  callSource(entry.system, "start")
+  return true
+end
+
+local function stopParticle(entry)
+  if not entry then
+    return false
+  end
+  callSource(entry.system, "stop")
+  return true
+end
+
+local function resetParticle(entry)
+  if not entry then
+    return false
+  end
+  callSource(entry.system, "reset")
+  return true
+end
+
 function Adapter:reset()
   feel.clear(self.cameraTarget)
   for _, entry in pairs(self.soundEntries) do
@@ -261,8 +309,46 @@ function Adapter:stopSounds()
   return true
 end
 
+function Adapter:particle(name, system, opts)
+  if not name then
+    return self
+  end
+
+  if not self.particleEntries[name] then
+    self.particleOrder[#self.particleOrder + 1] = name
+  end
+
+  opts = opts or {}
+  self.particleEntries[name] = {
+    name = name,
+    system = system,
+  }
+  setParticlePosition(self.particleEntries[name], opts)
+  return self
+end
+
+function Adapter:particles(map)
+  map = map or {}
+  for _, entry in ipairs(map) do
+    if type(entry) == "table" then
+      self:particle(entry.name or entry[1], entry.system or entry[2], entry.opts or entry.options)
+    end
+  end
+  for name, system in pairs(map) do
+    if type(name) ~= "number" then
+      self:particle(name, system)
+    end
+  end
+  return self
+end
+
 function Adapter:update(dt)
   dt = dt or 0
+
+  for _, name in ipairs(self.particleOrder) do
+    local entry = self.particleEntries[name]
+    callSource(entry and entry.system, "update", dt)
+  end
 
   if self.shake.remaining > 0 then
     self.shake.remaining = math.max(0, self.shake.remaining - dt)
@@ -378,6 +464,18 @@ function Adapter:emit(event, ctx)
     return setSoundValue(self.soundEntries[payload.cue], "pitch", payload.pitch, payload.duration, payload.ease)
   elseif kind == "sound.pan" then
     return setSoundValue(self.soundEntries[payload.cue], "pan", payload.pan, payload.duration, payload.ease)
+  elseif kind == "particle.emit" then
+    return emitParticle(particleEntry(self, payload), payload)
+  elseif kind == "particle.start" then
+    return startParticle(particleEntry(self, payload), payload)
+  elseif kind == "particle.stop" then
+    return stopParticle(particleEntry(self, payload))
+  elseif kind == "particle.reset" then
+    return resetParticle(particleEntry(self, payload))
+  elseif kind == "particle.move" then
+    local entry = particleEntry(self, payload)
+    setParticlePosition(entry, payload)
+    return entry ~= nil
   end
 
   return false, ctx
@@ -447,6 +545,21 @@ function Adapter:drawOverlay()
   drawOverlay(self.flash)
 end
 
+function Adapter:drawParticles()
+  if not love or not love.graphics or not love.graphics.draw then
+    return
+  end
+  if love.graphics.setColor then
+    love.graphics.setColor(1, 1, 1, 1)
+  end
+  for _, name in ipairs(self.particleOrder) do
+    local entry = self.particleEntries[name]
+    if entry and entry.system then
+      love.graphics.draw(entry.system)
+    end
+  end
+end
+
 function FeelLove.new(opts)
   opts = opts or {}
   local cameraTarget = feel.target({
@@ -480,6 +593,8 @@ function FeelLove.new(opts)
     flash = {},
     fade = {},
     soundEntries = {},
+    particleEntries = {},
+    particleOrder = {},
   }, Adapter)
 
   adapter:reset()
