@@ -461,7 +461,7 @@ describe("feel.love", function()
     feel.update(0.4)
 
     assert.are.equal(0, fx.post.effects.bloom.target.values.intensity)
-    assert.are.equal(0.2, fx.post.effects.bloom.target.values.threshold)
+    assert.is_true(math.abs(fx.post.effects.bloom.target.values.threshold - 0.2) < 0.000001)
   end)
 
   it("can restart post weight tweens", function()
