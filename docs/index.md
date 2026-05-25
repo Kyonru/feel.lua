@@ -6,5 +6,5 @@
 
 - [Core Runner](core-runner.md): targets, named sequences, playback, updates, clearing, and callback context.
 - [Sequence Steps](sequence-steps.md): `animate`, `emit`, `audio`, `wait`, `play`, `parallel`, `repeat`, `random`, `callback`, and `log`.
-- [LOVE Adapter](love-adapter.md): registered sound cues, particle systems, camera events, screen overlays, and adapter handlers.
+- [LOVE Adapter](love-adapter.md): registered sound cues, particle systems, shaders, camera events, screen overlays, and adapter handlers.
 - [LOVE Examples](love-examples.md): the showcase app and feature-specific scene layout.

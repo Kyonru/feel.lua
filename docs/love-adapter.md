@@ -1,6 +1,6 @@
 # LOVE Adapter
 
-`feel.love` is an opt-in adapter for LOVE-specific side effects. It keeps the core runner small while giving LOVE apps convenient handlers for sound, particles, camera, and screen feedback.
+`feel.love` is an opt-in adapter for LOVE-specific side effects. It keeps the core runner small while giving LOVE apps convenient handlers for sound, particles, shaders, camera, and screen feedback.
 
 ```lua
 local feel = require("feel")
@@ -145,6 +145,53 @@ feel.define("fire.stop", {
 ```
 
 Call `fx:drawParticles()` where the systems should render. If particles should move with the camera adapter, draw them between `fx:push()` and `fx:pop()`.
+
+## Shaders
+
+Register app-created LOVE `Shader`s with `fx:shader(name, shader, opts)` or `fx:shaders(map)`.
+
+```lua
+local shader = love.graphics.newShader([[
+extern number amount;
+
+vec4 effect(vec4 color, Image tex, vec2 uv, vec2 screen)
+{
+  vec4 pixel = Texel(tex, uv) * color;
+  pixel.r = min(1.0, pixel.r + amount);
+  return pixel;
+}
+]])
+
+fx:shader("glow", shader, { uniforms = { amount = 0 } })
+```
+
+Shader code and uniform names stay app-owned. The adapter stores the shader, sends uniforms, and can tween numeric scalar uniforms through `feel.update(dt)`.
+
+```lua
+feel.define("glow.pulse", {
+  { kind = "emit", event = "shader.apply", payload = { name = "glow" } },
+  { kind = "emit", event = "shader.send", payload = { name = "glow", uniform = "amount", value = 0.2 } },
+  { kind = "emit", event = "shader.tween", payload = { name = "glow", uniform = "amount", value = 0.8, duration = 0.15 } },
+  { kind = "wait", duration = 0.2 },
+  { kind = "emit", event = "shader.tween", payload = { name = "glow", uniform = "amount", value = 0, duration = 0.3 } },
+})
+```
+
+Supported shader events are `shader.send`, `shader.tween`, `shader.apply`, and `shader.clear`.
+
+```lua
+feel.define("glow.clear", {
+  { kind = "emit", event = "shader.clear", payload = {} },
+})
+```
+
+For scoped drawing, wrap only the draw calls that should use the shader:
+
+```lua
+fx:pushShader("glow")
+drawActor()
+fx:popShader()
+```
 
 ## Camera And Screen
 

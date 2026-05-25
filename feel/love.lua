@@ -239,11 +239,70 @@ local function resetParticle(entry)
   return true
 end
 
+local function shaderEntry(adapter, payloadOrName)
+  if type(payloadOrName) == "table" then
+    return adapter.shaderEntries[payloadOrName.name]
+  end
+  return adapter.shaderEntries[payloadOrName]
+end
+
+local function sendShaderValue(entry, uniform, value)
+  if not entry or not uniform or value == nil then
+    return false
+  end
+  entry.values[uniform] = value
+  callSource(entry.shader, "send", uniform, value)
+  return true
+end
+
+local function tweenShaderValue(entry, uniform, value, duration, ease)
+  if not entry or not uniform or type(value) ~= "number" then
+    return false
+  end
+
+  if entry.values[uniform] == nil then
+    entry.values[uniform] = 0
+  end
+  entry.target.values[uniform] = entry.values[uniform]
+
+  if not duration or duration <= 0 then
+    return sendShaderValue(entry, uniform, value)
+  end
+
+  feel.play({
+    kind = "animate",
+    duration = duration,
+    ease = ease,
+    to = { [uniform] = value },
+    onUpdate = function(values)
+      sendShaderValue(entry, uniform, values[uniform])
+    end,
+    onComplete = function(values)
+      sendShaderValue(entry, uniform, values[uniform])
+    end,
+  }, entry.target)
+  return true
+end
+
+local function applyShader(adapter, entry)
+  if not entry or not love or not love.graphics or not love.graphics.setShader then
+    return false
+  end
+  love.graphics.setShader(entry.shader)
+  adapter.activeShader = entry.shader
+  return true
+end
+
 function Adapter:reset()
   feel.clear(self.cameraTarget)
   for _, entry in pairs(self.soundEntries) do
     feel.clear(entry.target)
   end
+  for _, entry in pairs(self.shaderEntries) do
+    feel.clear(entry.target)
+  end
+  self.shaderStack = {}
+  self.activeShader = nil
 
   self.camera.x = self.defaults.x
   self.camera.y = self.defaults.y
@@ -340,6 +399,68 @@ function Adapter:particles(map)
     end
   end
   return self
+end
+
+function Adapter:shader(name, shader, opts)
+  if not name then
+    return self
+  end
+
+  opts = opts or {}
+  local target = feel.target()
+  local entry = {
+    name = name,
+    shader = shader,
+    target = target,
+    values = {},
+  }
+
+  for uniform, value in pairs(opts.uniforms or opts.values or {}) do
+    entry.values[uniform] = value
+    if type(value) == "number" then
+      target.values[uniform] = value
+    end
+    callSource(shader, "send", uniform, value)
+  end
+
+  self.shaderEntries[name] = entry
+  return self
+end
+
+function Adapter:shaders(map)
+  for name, shader in pairs(map or {}) do
+    self:shader(name, shader)
+  end
+  return self
+end
+
+function Adapter:pushShader(name)
+  local entry = shaderEntry(self, name)
+  if not entry or not love or not love.graphics or not love.graphics.setShader then
+    return false
+  end
+
+  local previous
+  if love.graphics.getShader then
+    previous = love.graphics.getShader()
+  end
+  self.shaderStack[#self.shaderStack + 1] = { shader = previous }
+  love.graphics.setShader(entry.shader)
+  self.activeShader = entry.shader
+  return true
+end
+
+function Adapter:popShader()
+  if not love or not love.graphics or not love.graphics.setShader then
+    return false
+  end
+
+  local frame = self.shaderStack[#self.shaderStack]
+  self.shaderStack[#self.shaderStack] = nil
+  local previous = frame and frame.shader or nil
+  love.graphics.setShader(previous)
+  self.activeShader = previous
+  return true
 end
 
 function Adapter:update(dt)
@@ -476,6 +597,20 @@ function Adapter:emit(event, ctx)
     local entry = particleEntry(self, payload)
     setParticlePosition(entry, payload)
     return entry ~= nil
+  elseif kind == "shader.send" then
+    return sendShaderValue(shaderEntry(self, payload), payload.uniform, payload.value)
+  elseif kind == "shader.tween" then
+    return tweenShaderValue(shaderEntry(self, payload), payload.uniform, payload.value, payload.duration, payload.ease)
+  elseif kind == "shader.apply" then
+    return applyShader(self, shaderEntry(self, payload))
+  elseif kind == "shader.clear" then
+    if love and love.graphics and love.graphics.setShader then
+      love.graphics.setShader()
+      self.activeShader = nil
+      self.shaderStack = {}
+      return true
+    end
+    return false
   end
 
   return false, ctx
@@ -595,6 +730,8 @@ function FeelLove.new(opts)
     soundEntries = {},
     particleEntries = {},
     particleOrder = {},
+    shaderEntries = {},
+    shaderStack = {},
   }, Adapter)
 
   adapter:reset()

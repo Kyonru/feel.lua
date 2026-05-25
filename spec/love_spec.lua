@@ -53,6 +53,15 @@ describe("feel.love", function()
     }
   end
 
+  local function shader(name)
+    return {
+      name = name,
+      send = function(_, uniform, value)
+        calls[#calls + 1] = { "send", name, uniform, value }
+      end,
+    }
+  end
+
   local function countCalls(method)
     local count = 0
     for _, call in ipairs(calls) do
@@ -104,6 +113,13 @@ describe("feel.love", function()
         end,
         draw = function(system)
           calls[#calls + 1] = { "draw", system }
+        end,
+        setShader = function(value)
+          _G.love.graphics.currentShader = value
+          calls[#calls + 1] = { "setShader", value }
+        end,
+        getShader = function()
+          return _G.love.graphics.currentShader
         end,
       },
     }
@@ -302,6 +318,69 @@ describe("feel.love", function()
 
     assert.are.same({ "emit", "spark", 1 }, calls[1])
     assert.are.same({ "particle.emit", "particle.emit" }, seen)
+  end)
+
+  it("registers shaders and sends uniforms", function()
+    local fx = feelLove.new()
+    local glow = shader("glow")
+
+    fx:shader("glow", glow, { uniforms = { amount = 0.2 } })
+    fx:shaders({ scan = shader("scan") })
+    fx:emit({ kind = "shader.send", payload = { name = "glow", uniform = "amount", value = 0.75 } })
+
+    assert.are.same({ "send", "glow", "amount", 0.2 }, calls[1])
+    assert.are.same({ "send", "glow", "amount", 0.75 }, calls[2])
+    assert.is_not_nil(fx.shaderEntries.scan)
+  end)
+
+  it("tweens numeric shader uniforms through feel.update", function()
+    local fx = feelLove.new()
+
+    fx:shader("glow", shader("glow"), { uniforms = { amount = 0 } })
+    calls = {}
+    fx:emit({ kind = "shader.tween", payload = { name = "glow", uniform = "amount", value = 1, duration = 0.1 } })
+    feel.update(0.1)
+
+    assert.are.equal(1, fx.shaderEntries.glow.values.amount)
+    assert.are.same({ "send", "glow", "amount", 1 }, calls[#calls])
+  end)
+
+  it("applies clears and restores shaders", function()
+    local fx = feelLove.new()
+    local base = shader("base")
+    local glow = shader("glow")
+
+    fx:shader("glow", glow)
+    calls = {}
+    fx:emit({ kind = "shader.apply", payload = { name = "glow" } })
+    fx:emit({ kind = "shader.clear", payload = {} })
+    _G.love.graphics.currentShader = base
+    fx:pushShader("glow")
+    fx:popShader()
+
+    assert.are.same({ "setShader", glow }, calls[1])
+    assert.are.same({ "setShader", nil }, calls[2])
+    assert.are.same({ "setShader", glow }, calls[3])
+    assert.are.same({ "setShader", base }, calls[4])
+  end)
+
+  it("shader handlers still call extra emit callbacks", function()
+    local fx = feelLove.new()
+    local seen = {}
+
+    fx:shader("glow", shader("glow"))
+    calls = {}
+    local handlers = fx:handlers({
+      emit = function(event)
+        seen[#seen + 1] = event.kind
+      end,
+    })
+    handlers.emit({ kind = "shader.send", payload = { name = "glow", uniform = "amount", value = 0.4 } })
+    handlers.emit({ kind = "shader.send", payload = { name = "missing", uniform = "amount", value = 0.4 } })
+    handlers.emit({ kind = "shader.unknown", payload = { name = "glow" } })
+
+    assert.are.same({ "send", "glow", "amount", 0.4 }, calls[1])
+    assert.are.same({ "shader.send", "shader.send", "shader.unknown" }, seen)
   end)
 
   it("update decays shake and flash over time", function()
