@@ -1,8 +1,8 @@
 # feel.lua
 
-`feel.lua` is a tiny feedback-sequence helper for Lua games and interactive toys. It wraps a vendored copy of `flux` so you can describe a piece of game feel as one sequence: animation, emitted effects, audio cues, and callbacks.
+`feel.lua` is a tiny LOVE2D-first feedback sequencing library for making actions feel good. It wraps a vendored copy of `flux` so you can describe a piece of game feel as one recipe: animation, timing, emitted effects, audio cues, callbacks, random choices, loops, and grouped steps.
 
-It is framework-agnostic, but the repository includes a LOVE example.
+It is a feedback recipe runner, not a Unity Feel clone. The core stays small and table-driven; engine-specific work belongs in LOVE helpers, adapters, or user callbacks.
 
 ## What it does
 
@@ -10,7 +10,8 @@ It is framework-agnostic, but the repository includes a LOVE example.
 - Plays named or inline sequences with `feel.play`.
 - Animates common transform-style values on lightweight targets.
 - Emits host-owned events for particles, shake, flashes, beams, sounds, or anything else.
-- Runs sequenced steps in order, waiting for animation steps to complete before continuing.
+- Runs sequenced steps in order, waiting for animation, pause, nested, repeated, or parallel steps to complete before continuing.
+- Chooses weighted random branches and repeats child recipes.
 
 ## Install
 
@@ -34,8 +35,14 @@ local button = feel.target({
 
 feel.define("button.press", {
   { kind = "audio", cue = "press" },
-  { kind = "emit", event = "burst", payload = { count = 18 } },
-  { kind = "animate", duration = 0.06, to = { scale = 0.92, y = 3 }, ease = "quadout" },
+  {
+    kind = "parallel",
+    steps = {
+      { kind = "emit", event = "burst", payload = { count = 18 } },
+      { kind = "animate", duration = 0.06, to = { scale = 0.92, y = 3 }, ease = "quadout" },
+    },
+  },
+  { kind = "wait", duration = 0.03 },
   { kind = "animate", duration = 0.16, to = { scale = 1, y = 0 }, ease = "backout" },
 })
 
@@ -117,6 +124,77 @@ Audio steps call `opts.audio(event, ctx)` with `event.cue`.
 
 Callback steps run arbitrary Lua code and then continue to the next step.
 
+### Wait / Pause
+
+```lua
+{ kind = "wait", duration = 0.12 }
+```
+
+Wait and pause steps delay the next step. They advance through `feel.update(dt)`.
+
+### Play
+
+```lua
+{ kind = "play", name = "screen.flash" }
+```
+
+Play steps run a named or inline child sequence before continuing. Child sequences inherit the current `target`, `trigger`, and `opts` unless the step provides overrides.
+
+```lua
+{ kind = "play", sequence = {
+  { kind = "emit", event = "camera.shake", payload = { amount = 6 } },
+} }
+```
+
+### Parallel
+
+```lua
+{
+  kind = "parallel",
+  steps = {
+    { kind = "animate", duration = 0.08, to = { scale = 1.12 } },
+    { kind = "emit", event = "camera.shake", payload = { amount = 8 } },
+    { kind = "wait", duration = 0.12 },
+  },
+}
+```
+
+Parallel steps run child sequences at the same time and continue after every branch finishes.
+
+### Repeat
+
+```lua
+{
+  kind = "repeat",
+  count = 3,
+  step = { kind = "emit", event = "spark" },
+}
+```
+
+Repeat steps run a child step or sequence multiple times. `forever = true` is supported for loops that should run until `feel.clear()` cancels them.
+
+### Random
+
+```lua
+{
+  kind = "random",
+  options = {
+    { weight = 3, step = { kind = "emit", event = "spark.small" } },
+    { weight = 1, step = { kind = "emit", event = "spark.big" } },
+  },
+}
+```
+
+Random steps choose exactly one weighted child step or sequence.
+
+### Log
+
+```lua
+{ kind = "log", message = "played launch feedback" }
+```
+
+Log steps call `opts.log(message, ctx)` when provided, otherwise they print the message.
+
 ## API
 
 ### `feel.target(meta)`
@@ -158,7 +236,7 @@ feel.play("hit.strong", target, {
 
 ### `feel.update(dt)`
 
-Advances active tweens. Call this once per frame.
+Advances active tweens, waits, and child sequence runners. Call this once per frame.
 
 ```lua
 feel.update(dt)
@@ -168,7 +246,7 @@ Returns whether there were active tweens before or after the update.
 
 ### `feel.clear(target)`
 
-Clears registered sequences and active tween state. When given a target, it stops that target's active tweens.
+Clears registered sequences, active tween state, waits, nested sequences, repeats, and parallel branches. When given a target, it stops that target's active tweens and cancels active sequences using that target.
 
 ```lua
 feel.clear()
@@ -185,6 +263,20 @@ love examples/love2d
 
 The demo shows hover, press, launch, shake, flash, particle, beam, audio, and callback sequences.
 
+## Design Direction
+
+`feel.lua` is LOVE-first, but the core should stay a tiny recipe runner. Current core primitives are `animate`, `emit`, `audio`, `callback`, `wait`, `play`, `parallel`, `repeat`, `random`, and `log`.
+
+Future LOVE-first helpers should build on those primitives instead of expanding into one component per effect. Good helper families include `sound`, `camera`, `screen`, `particle`, `text`, `sprite`, `time`, `spring`, and `shake`.
+
+For example, a future camera helper might translate this:
+
+```lua
+{ kind = "emit", event = "camera.shake", payload = { amount = 8, duration = 0.2 } }
+```
+
+into whichever camera object or draw transform your LOVE game uses.
+
 ## Tests
 
 The specs are written with Busted:
@@ -196,6 +288,7 @@ busted spec
 ## Notes
 
 - `feel.lua` owns sequencing and tween values, but your app owns rendering and side effects.
+- LOVE-specific effects should be implemented as small handlers or adapters around `emit` and `audio`.
 - `feel.fields` exposes the default transform fields.
 - `feel.flux` exposes the vendored Flux module if you need direct access.
 - `feel.normalizeStep` and `feel.normalizeSequence` are exposed for inspection or advanced tooling.

@@ -12,6 +12,7 @@ local Feel = {}
 local group = flux.group()
 local registry = {}
 local targets = setmetatable({}, { __mode = "k" })
+local runners = {}
 
 local FIELDS = {
   "opacity",
@@ -170,9 +171,142 @@ local function emit(opts, name, event, ctx)
   end
 end
 
-local function runStep(ctx, step, nextStep)
+local function removeRunner(runner)
+  for index = #runners, 1, -1 do
+    if runners[index] == runner then
+      table.remove(runners, index)
+      return
+    end
+  end
+end
+
+local function removeChildRunner(parent, child)
+  if not parent or not parent.children then
+    return
+  end
+
+  for index = #parent.children, 1, -1 do
+    if parent.children[index] == child then
+      table.remove(parent.children, index)
+      return
+    end
+  end
+end
+
+local function mergeOptions(base, extra)
+  if type(extra) ~= "table" then
+    return base
+  end
+
+  local result = {}
+  for key, value in pairs(base or {}) do
+    result[key] = value
+  end
+  for key, value in pairs(extra) do
+    result[key] = value
+  end
+  return result
+end
+
+local runSequence
+
+local function cancelRunner(runner)
+  if not runner or runner.cancelled then
+    return
+  end
+
+  runner.cancelled = true
+  runner.wait = nil
+
+  for _, child in ipairs(runner.children or {}) do
+    cancelRunner(child)
+  end
+  runner.children = {}
+
+  removeChildRunner(runner.parent, runner)
+  removeRunner(runner)
+end
+
+local function childOptions(ctx, step)
+  return mergeOptions(ctx.opts, step.opts)
+end
+
+local function childTarget(ctx, step)
+  if step.target ~= nil then
+    return step.target
+  end
+  return ctx.target
+end
+
+local function childTrigger(ctx, step)
+  return step.trigger or ctx.trigger
+end
+
+local function childSequence(step)
+  return step.sequence or step.steps or step.step or step.feedback or step.name or step[1]
+end
+
+local function selectedRandomOption(options)
+  if type(options) ~= "table" or #options == 0 then
+    return nil
+  end
+
+  local total = 0
+  for _, option in ipairs(options) do
+    local weight = option.weight or option.chance or 1
+    if weight > 0 then
+      total = total + weight
+    end
+  end
+
+  if total <= 0 then
+    return nil
+  end
+
+  local pick = math.random() * total
+  for _, option in ipairs(options) do
+    local weight = option.weight or option.chance or 1
+    if weight > 0 then
+      pick = pick - weight
+      if pick <= 0 then
+        return option
+      end
+    end
+  end
+
+  return options[#options]
+end
+
+local function finishRunner(runner)
+  if runner.cancelled then
+    return
+  end
+
+  runner.cancelled = true
+  removeChildRunner(runner.parent, runner)
+  removeRunner(runner)
+
+  if runner.done then
+    runner.done(runner.ctx)
+  end
+end
+
+local function runStep(runner, step, nextStep)
+  local ctx = runner.ctx
   local kind = step.kind or "emit"
   local opts = ctx.opts or {}
+
+  if kind == "wait" or kind == "pause" then
+    runner.wait = {
+      remaining = step.duration or step.time or 0,
+      nextStep = nextStep,
+    }
+    if runner.wait.remaining <= 0 then
+      runner.wait = nil
+      nextStep()
+    end
+    return
+  end
 
   if kind == "animate" then
     local state = stateFor(ctx.target)
@@ -203,6 +337,9 @@ local function runStep(ctx, step, nextStep)
       end
     end)
     tween:oncomplete(function()
+      if runner.cancelled then
+        return
+      end
       state.active = math.max(0, (state.active or 1) - 1)
       removeTween(state, tween)
       if step.onComplete then
@@ -220,6 +357,96 @@ local function runStep(ctx, step, nextStep)
     if opts.markDirty then
       opts.markDirty(ctx)
     end
+    return
+  end
+
+  if kind == "play" then
+    local sequence = childSequence(step)
+    if sequence == nil or sequence == false then
+      nextStep()
+      return
+    end
+
+    runSequence(sequence, childTarget(ctx, step), childOptions(ctx, step), nextStep, {
+      parent = runner,
+      trigger = childTrigger(ctx, step),
+      source = sequence,
+    })
+    return
+  end
+
+  if kind == "parallel" then
+    local children = step.steps or step.sequences or step[1]
+    if type(children) ~= "table" or #children == 0 then
+      nextStep()
+      return
+    end
+
+    local remaining = #children
+    local function childDone()
+      if runner.cancelled then
+        return
+      end
+      remaining = remaining - 1
+      if remaining <= 0 then
+        nextStep()
+      end
+    end
+
+    for _, child in ipairs(children) do
+      runSequence(child, childTarget(ctx, step), childOptions(ctx, step), childDone, {
+        parent = runner,
+        trigger = childTrigger(ctx, step),
+        source = child,
+      })
+    end
+    return
+  end
+
+  if kind == "repeat" then
+    local sequence = childSequence(step)
+    local count = step.count or step.times or 1
+    if sequence == nil or sequence == false or (not step.forever and count <= 0) then
+      nextStep()
+      return
+    end
+
+    local played = 0
+    local function playAgain()
+      if runner.cancelled then
+        return
+      end
+      if not step.forever then
+        played = played + 1
+        if played > count then
+          nextStep()
+          return
+        end
+      end
+      runSequence(sequence, childTarget(ctx, step), childOptions(ctx, step), playAgain, {
+        parent = runner,
+        trigger = childTrigger(ctx, step),
+        source = sequence,
+      })
+    end
+
+    playAgain()
+    return
+  end
+
+  if kind == "random" then
+    local option = selectedRandomOption(step.options or step[1])
+    local sequence = option and (option.step or option.sequence or option.steps or option[1])
+    if sequence == nil or sequence == false then
+      nextStep()
+      return
+    end
+
+    runSequence(sequence, childTarget(ctx, step), childOptions(ctx, step), nextStep, {
+      parent = runner,
+      trigger = childTrigger(ctx, step),
+      source = sequence,
+    })
     return
   end
 
@@ -251,9 +478,69 @@ local function runStep(ctx, step, nextStep)
     if type(callback) == "function" then
       callback(ctx)
     end
+  elseif kind == "log" then
+    local message = step.message or step.text or step[1] or ""
+    if type(opts.log) == "function" then
+      opts.log(message, ctx)
+    else
+      print(message)
+    end
   end
 
   nextStep()
+end
+
+runSequence = function(nameOrSequence, target, opts, done, meta)
+  local sequence = normalizeSequence(nameOrSequence)
+  if not sequence then
+    if done then
+      done()
+    end
+    return nil
+  end
+
+  opts = opts or {}
+  meta = meta or {}
+  local ctx = {
+    target = target,
+    trigger = meta.trigger or opts.trigger or "manual",
+    source = meta.source or nameOrSequence,
+    opts = opts,
+  }
+
+  local runner = {
+    ctx = ctx,
+    sequence = sequence,
+    index = 0,
+    done = done,
+    children = {},
+  }
+  ctx.runner = runner
+
+  if meta.parent then
+    runner.parent = meta.parent
+    meta.parent.children[#meta.parent.children + 1] = runner
+  end
+
+  runners[#runners + 1] = runner
+
+  local function nextStep()
+    if runner.cancelled then
+      return
+    end
+
+    runner.index = runner.index + 1
+    local step = runner.sequence[runner.index]
+    if not step then
+      finishRunner(runner)
+      return
+    end
+
+    runStep(runner, step, nextStep)
+  end
+
+  nextStep()
+  return ctx
 end
 
 function Feel.target(meta)
@@ -287,64 +574,64 @@ function Feel.play(nameOrSequence, target, opts)
     return nil
   end
 
-  local sequence = normalizeSequence(nameOrSequence)
-  if not sequence then
-    return nil
-  end
-
-  opts = opts or {}
-  local ctx = {
-    target = target,
-    trigger = opts.trigger or "manual",
-    source = nameOrSequence,
-    opts = opts,
-  }
-
-  local index = 0
-  local function nextStep()
-    index = index + 1
-    local step = sequence[index]
-    if not step then
-      return
-    end
-    runStep(ctx, step, nextStep)
-  end
-
-  nextStep()
-  return ctx
+  return runSequence(nameOrSequence, target, opts)
 end
 
 function Feel.update(dt)
-  local hadActive = #group > 0
+  dt = dt or 0
+  local hadActive = #group > 0 or #runners > 0
   group:update(dt or 0)
-  return hadActive or #group > 0
+
+  for index = #runners, 1, -1 do
+    local runner = runners[index]
+    local wait = runner and runner.wait
+    if wait then
+      wait.remaining = wait.remaining - dt
+      if wait.remaining <= 0 then
+        runner.wait = nil
+        wait.nextStep()
+      end
+    end
+  end
+
+  return hadActive or #group > 0 or #runners > 0
 end
 
 local function clearTarget(target)
   local state = target and targets[target]
-  if not state then
-    return
+  if state then
+    for _, tween in ipairs(state.tweens or {}) do
+      if tween.stop then
+        tween:stop()
+      end
+    end
+    targets[target] = nil
   end
 
-  for _, tween in ipairs(state.tweens or {}) do
-    if tween.stop then
-      tween:stop()
+  for index = #runners, 1, -1 do
+    local runner = runners[index]
+    if runner and runner.ctx and runner.ctx.target == target then
+      cancelRunner(runner)
     end
   end
-  targets[target] = nil
 end
 
 function Feel.clear(target)
-  registry = {}
   if target then
     clearTarget(target)
     return
   end
 
+  registry = {}
+
   for index = #group, 1, -1 do
     group:remove(index)
   end
 
+  for index = #runners, 1, -1 do
+    cancelRunner(runners[index])
+  end
+  runners = {}
   targets = setmetatable({}, { __mode = "k" })
 end
 
