@@ -4,9 +4,9 @@ icon: lucide/download
 
 # Installation
 
-## Option 1: Feather
+## Option 1: [Feather](https://kyonru.github.io/feather/installation/)
 
-Install the verified Feather package:
+Install the verified [Feather package](https://kyonru.github.io/feather/packages/#feather-package-install-name-name2):
 
 ```sh
 feather package install feel

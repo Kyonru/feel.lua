@@ -16,7 +16,7 @@ https://github.com/user-attachments/assets/6b15a87f-5a11-42f6-922b-ccf8bd0627f7
 
 ## Install
 
-Install with Feather:
+Install with [Feather](https://kyonru.github.io/feather/installation/):
 
 ```sh
 feather package install feel
