@@ -11,6 +11,7 @@ The showcase uses left and right arrows to move between feature scenes. Each sce
 ## Scenes
 
 - `scenes/feedback_stack.lua`: a full recipe stack with animation, audio, emit events, callbacks, particles, beams, shake, and flash.
+- `scenes/restart.lua`: side-by-side core playback showing stacked plays versus `restart = true`.
 - `scenes/sound_controls.lua`: registered LOVE cue alternates plus `sound.volume`, `sound.pitch`, and `sound.pan`.
 - `scenes/particles.lua`: registered LOVE `ParticleSystem`s driven by `particle.emit`, `particle.start`, `particle.stop`, `particle.reset`, and `particle.move`.
 - `scenes/shaders.lua`: registered LOVE `Shader`s driven by `shader.send`, `shader.tween`, `shader.apply`, and `shader.clear`.

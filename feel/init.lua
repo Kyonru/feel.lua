@@ -41,6 +41,8 @@ local Feel = {}
 ---@field audio? fun(event: FeelAudioEvent, ctx: FeelContext)
 ---@field log? fun(message: string, ctx: FeelContext)
 ---@field markDirty? fun(ctx: FeelContext)
+---@field restart? boolean
+---@field key? string|number|table
 ---@field [string] any
 
 ---@class FeelEvent
@@ -65,9 +67,12 @@ local Feel = {}
 ---@field index integer
 ---@field done? fun(ctx?: FeelContext)
 ---@field children FeelRunner[]
+---@field tweens table[]
 ---@field parent? FeelRunner
 ---@field wait? FeelWaitState
 ---@field cancelled? boolean
+---@field restartSlot? table
+---@field restartKey? string|number|table
 
 ---@class FeelWaitState
 ---@field remaining number
@@ -173,6 +178,8 @@ local group = flux.group()
 local registry = {}
 local targets = setmetatable({}, { __mode = "k" })
 local runners = {}
+local restartTargets = setmetatable({}, { __mode = "k" })
+local nilRestartSlots = {}
 
 local FIELDS = {
   "opacity",
@@ -324,6 +331,15 @@ local function removeTween(state, tween)
   end
 end
 
+local function removeRunnerTween(runner, tween)
+  for index = #(runner.tweens or {}), 1, -1 do
+    if runner.tweens[index].tween == tween then
+      table.remove(runner.tweens, index)
+      return
+    end
+  end
+end
+
 local function emit(opts, name, event, ctx)
   local handler = opts and opts[name]
   if type(handler) == "function" then
@@ -353,19 +369,37 @@ local function removeChildRunner(parent, child)
   end
 end
 
-local function mergeOptions(base, extra)
-  if type(extra) ~= "table" then
-    return base
-  end
-
+local function childOptions(ctx, step)
   local result = {}
-  for key, value in pairs(base or {}) do
-    result[key] = value
+  local stepOpts = type(step.opts) == "table" and step.opts or nil
+  for key, value in pairs(ctx.opts or {}) do
+    if key ~= "restart" and key ~= "key" then
+      result[key] = value
+    end
   end
-  for key, value in pairs(extra) do
+  for key, value in pairs(stepOpts or {}) do
     result[key] = value
   end
   return result
+end
+
+local function restartSlotsFor(target)
+  if target == nil then
+    return nilRestartSlots
+  end
+
+  local slots = restartTargets[target]
+  if not slots then
+    slots = {}
+    restartTargets[target] = slots
+  end
+  return slots
+end
+
+local function clearRestartSlot(runner)
+  if runner and runner.restartSlot and runner.restartSlot[runner.restartKey] == runner then
+    runner.restartSlot[runner.restartKey] = nil
+  end
 end
 
 local runSequence
@@ -378,17 +412,28 @@ local function cancelRunner(runner)
   runner.cancelled = true
   runner.wait = nil
 
+  for _, active in ipairs(runner.tweens or {}) do
+    if active.tween and active.tween.stop then
+      active.tween:stop()
+    end
+    if active.state then
+      active.state.active = math.max(0, (active.state.active or 1) - 1)
+      removeTween(active.state, active.tween)
+      if active.state.active == 0 and isIdentity(active.state.values) then
+        targets[active.state.target] = nil
+      end
+    end
+  end
+  runner.tweens = {}
+
   for _, child in ipairs(runner.children or {}) do
     cancelRunner(child)
   end
   runner.children = {}
 
+  clearRestartSlot(runner)
   removeChildRunner(runner.parent, runner)
   removeRunner(runner)
-end
-
-local function childOptions(ctx, step)
-  return mergeOptions(ctx.opts, step.opts)
 end
 
 local function childTarget(ctx, step)
@@ -443,6 +488,7 @@ local function finishRunner(runner)
   end
 
   runner.cancelled = true
+  clearRestartSlot(runner)
   removeChildRunner(runner.parent, runner)
   removeRunner(runner)
 
@@ -502,6 +548,7 @@ local function runStep(runner, step, nextStep)
       end
       state.active = math.max(0, (state.active or 1) - 1)
       removeTween(state, tween)
+      removeRunnerTween(runner, tween)
       if step.onComplete then
         step.onComplete(state.values, ctx)
       end
@@ -514,6 +561,10 @@ local function runStep(runner, step, nextStep)
       nextStep()
     end)
     state.tweens[#state.tweens + 1] = tween
+    runner.tweens[#runner.tweens + 1] = {
+      state = state,
+      tween = tween,
+    }
     if opts.markDirty then
       opts.markDirty(ctx)
     end
@@ -661,6 +712,19 @@ runSequence = function(nameOrSequence, target, opts, done, meta)
 
   opts = opts or {}
   meta = meta or {}
+  local restartSlot
+  local restartKey
+  if opts.restart == true then
+    restartKey = opts.key
+    if restartKey == nil then
+      restartKey = nameOrSequence
+    end
+    if restartKey ~= nil then
+      restartSlot = restartSlotsFor(target)
+      cancelRunner(restartSlot[restartKey])
+    end
+  end
+
   local ctx = {
     target = target,
     trigger = meta.trigger or opts.trigger or "manual",
@@ -674,6 +738,9 @@ runSequence = function(nameOrSequence, target, opts, done, meta)
     index = 0,
     done = done,
     children = {},
+    tweens = {},
+    restartSlot = restartSlot,
+    restartKey = restartKey,
   }
   ctx.runner = runner
 
@@ -683,6 +750,9 @@ runSequence = function(nameOrSequence, target, opts, done, meta)
   end
 
   runners[#runners + 1] = runner
+  if restartSlot and restartKey ~= nil then
+    restartSlot[restartKey] = runner
+  end
 
   local function nextStep()
     if runner.cancelled then
@@ -787,6 +857,7 @@ local function clearTarget(target)
       cancelRunner(runner)
     end
   end
+  restartTargets[target] = nil
 end
 
 ---@param target? FeelTarget
@@ -808,6 +879,8 @@ function Feel.clear(target)
   end
   runners = {}
   targets = setmetatable({}, { __mode = "k" })
+  restartTargets = setmetatable({}, { __mode = "k" })
+  nilRestartSlots = {}
 end
 
 Feel.flux = flux

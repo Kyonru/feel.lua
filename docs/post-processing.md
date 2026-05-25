@@ -52,9 +52,9 @@ Bloom impact:
 ```lua
 feel.define("impact.bloom", {
   { kind = "emit", event = "post.set", payload = { effect = "bloom", values = { threshold = 0.55, softness = 0.18 } } },
-  { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 1.1 }, duration = 0.1, ease = "quadout" } },
+  { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 1.1 }, duration = 0.1, ease = "quadout", restart = true } },
   { kind = "wait", duration = 0.16 },
-  { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 0.25 }, duration = 0.35, ease = "quadout" } },
+  { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 0.25 }, duration = 0.35, ease = "quadout", restart = true } },
 })
 ```
 

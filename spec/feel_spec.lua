@@ -298,6 +298,124 @@ describe("feel.lua", function()
     assert.are.same({}, events)
   end)
 
+  it("restart cancels the previous run for the same target and key", function()
+    local target = feel.target()
+    local events = {}
+
+    feel.play({
+      { kind = "animate", to = { x = 10 }, duration = 0.2 },
+      { kind = "emit", event = "old" },
+    }, target, {
+      restart = true,
+      key = "impact",
+      emit = function(event)
+        events[#events + 1] = event.kind
+      end,
+    })
+    feel.update(0.1)
+
+    feel.play({
+      { kind = "animate", to = { x = 1 }, duration = 0.1 },
+      { kind = "emit", event = "new" },
+    }, target, {
+      restart = true,
+      key = "impact",
+      emit = function(event)
+        events[#events + 1] = event.kind
+      end,
+    })
+
+    feel.update(0.1)
+    feel.update(1)
+
+    assert.are.equal(1, target.values.x)
+    assert.are.same({ "new" }, events)
+  end)
+
+  it("restart slots are scoped by target", function()
+    local one = feel.target()
+    local two = feel.target()
+    local events = {}
+
+    local sequence = {
+      { kind = "wait", duration = 0.1 },
+      {
+        kind = "callback",
+        callback = function(ctx)
+          events[#events + 1] = ctx.target.label
+        end,
+      },
+    }
+    one.label = "one"
+    two.label = "two"
+
+    feel.play(sequence, one, { restart = true, key = "pulse" })
+    feel.play(sequence, two, { restart = true, key = "pulse" })
+    feel.play({
+      {
+        kind = "callback",
+        callback = function(ctx)
+          events[#events + 1] = ctx.target.label .. ":new"
+        end,
+      },
+    }, one, { restart = true, key = "pulse" })
+    feel.update(0.1)
+
+    assert.are.same({ "one:new", "two" }, events)
+  end)
+
+  it("named sequences restart without an explicit key", function()
+    local events = {}
+
+    feel.define("restart.named", {
+      { kind = "wait", duration = 0.1 },
+      { kind = "emit", event = "done" },
+    })
+
+    feel.play("restart.named", nil, {
+      restart = true,
+      emit = function(event)
+        events[#events + 1] = event.kind
+      end,
+    })
+    feel.play("restart.named", nil, {
+      restart = true,
+      emit = function(event)
+        events[#events + 1] = event.kind
+      end,
+    })
+    feel.update(0.1)
+
+    assert.are.same({ "done" }, events)
+  end)
+
+  it("restart options do not leak into child sequence runners", function()
+    local events = {}
+    local child = {
+      { kind = "wait", duration = 0.1 },
+      { kind = "emit", event = "child" },
+    }
+
+    feel.play({
+      {
+        kind = "parallel",
+        steps = {
+          child,
+          child,
+        },
+      },
+    }, nil, {
+      restart = true,
+      key = "parent",
+      emit = function(event)
+        events[#events + 1] = event.kind
+      end,
+    })
+    feel.update(0.1)
+
+    assert.are.same({ "child", "child" }, events)
+  end)
+
   it("loads from an arbitrary package prefix", function()
     local nestedPrefix = "lib.random.folder.feel"
     local loaders = package.searchers or package.loaders

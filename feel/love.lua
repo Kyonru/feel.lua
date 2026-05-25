@@ -76,6 +76,7 @@ Adapter.__index = Adapter
 ---@field pan? number
 
 ---@class FeelLoveSoundEntry
+---@field name string
 ---@field sources FeelLoveSourceLike[]
 ---@field restart boolean
 ---@field target table
@@ -146,6 +147,7 @@ Adapter.__index = Adapter
 ---@class FeelLovePostTweenOptions
 ---@field duration? number
 ---@field ease? string
+---@field restart? boolean
 
 ---@class FeelLoveEvent
 ---@field kind? string
@@ -350,6 +352,25 @@ local function callSource(source, method, ...)
   end
 end
 
+local function restartOptions(restart, key)
+  if restart == true then
+    return {
+      restart = true,
+      key = key,
+    }
+  end
+  return nil
+end
+
+local function cancelRestartedTween(target, key)
+  feel.play({
+    kind = "callback",
+  }, target, {
+    restart = true,
+    key = key,
+  })
+end
+
 local function applySourceValue(source, name, value)
   if value == nil then
     return
@@ -386,12 +407,16 @@ local function selectedSource(entry)
   return entry.sources[math.random(#entry.sources)]
 end
 
-local function setSoundValue(entry, name, value, duration, ease)
+local function setSoundValue(entry, name, value, duration, ease, restart)
   if not entry or value == nil then
     return false
   end
 
+  local key = "sound." .. tostring(entry.name) .. "." .. name
   if not duration or duration <= 0 then
+    if restart then
+      cancelRestartedTween(entry.target, key)
+    end
     entry.target.values[name] = value
     applySoundValues(entry)
     return true
@@ -408,7 +433,7 @@ local function setSoundValue(entry, name, value, duration, ease)
     onComplete = function()
       applySoundValues(entry)
     end,
-  }, entry.target)
+  }, entry.target, restartOptions(restart, key))
   return true
 end
 
@@ -419,9 +444,9 @@ local function playSound(entry, payload)
   end
 
   payload = payload or {}
-  setSoundValue(entry, "volume", payload.volume)
-  setSoundValue(entry, "pitch", payload.pitch)
-  setSoundValue(entry, "pan", payload.pan)
+  setSoundValue(entry, "volume", payload.volume, nil, nil, payload.restart)
+  setSoundValue(entry, "pitch", payload.pitch, nil, nil, payload.restart)
+  setSoundValue(entry, "pan", payload.pan, nil, nil, payload.restart)
 
   if entry.restart then
     callSource(source, "stop")
@@ -594,17 +619,21 @@ local function sendShaderValue(entry, uniform, value)
   return true
 end
 
-local function tweenShaderValue(entry, uniform, value, duration, ease)
+local function tweenShaderValue(entry, uniform, value, duration, ease, restart)
   if not entry or not uniform or type(value) ~= "number" then
     return false
   end
 
+  local key = "shader." .. tostring(entry.name) .. "." .. tostring(uniform)
   if entry.values[uniform] == nil then
     entry.values[uniform] = 0
   end
   entry.target.values[uniform] = entry.values[uniform]
 
   if not duration or duration <= 0 then
+    if restart then
+      cancelRestartedTween(entry.target, key)
+    end
     return sendShaderValue(entry, uniform, value)
   end
 
@@ -619,7 +648,7 @@ local function tweenShaderValue(entry, uniform, value, duration, ease)
     onComplete = function(values)
       sendShaderValue(entry, uniform, values[uniform])
     end,
-  }, entry.target)
+  }, entry.target, restartOptions(restart, key))
   return true
 end
 
@@ -815,6 +844,10 @@ local function setPostValues(adapter, effect, values)
   return true
 end
 
+local function postRestartKey(effect, key)
+  return "post." .. tostring(effect) .. "." .. tostring(key)
+end
+
 local function tweenPostValues(adapter, effect, values, opts)
   local entry = postEffect(adapter, effect)
   if not entry or type(values) ~= "table" then
@@ -836,6 +869,13 @@ local function tweenPostValues(adapter, effect, values, opts)
 
   opts = opts or {}
   if not opts.duration or opts.duration <= 0 then
+    if opts.restart then
+      for key, value in pairs(values) do
+        if type(value) == "number" then
+          cancelRestartedTween(entry.target, postRestartKey(effect, key))
+        end
+      end
+    end
     for key, value in pairs(values) do
       entry.target.values[key] = value
     end
@@ -843,6 +883,18 @@ local function tweenPostValues(adapter, effect, values, opts)
   end
 
   if next(to) == nil then
+    return true
+  end
+
+  if opts.restart then
+    for key, value in pairs(to) do
+      feel.play({
+        kind = "animate",
+        duration = opts.duration,
+        ease = opts.ease,
+        to = { [key] = value },
+      }, entry.target, restartOptions(true, postRestartKey(effect, key)))
+    end
     return true
   end
 
@@ -912,6 +964,7 @@ function Adapter:sound(name, sourceOrSources, opts)
   target.values.pan = opts.pan ~= nil and opts.pan or 0
 
   self.soundEntries[name] = {
+    name = name,
     sources = collectSources(sourceOrSources),
     restart = opts.restart ~= false,
     target = target,
@@ -1207,7 +1260,7 @@ function Adapter:emit(event, ctx)
       duration = payload.duration or self.defaults.tweenDuration,
       ease = payload.ease,
       to = { scale = payload.scale or self.defaults.scale },
-    }, self.cameraTarget)
+    }, self.cameraTarget, restartOptions(payload.restart, "camera.zoom"))
     return true
   elseif kind == "camera.move" then
     feel.play({
@@ -1218,9 +1271,12 @@ function Adapter:emit(event, ctx)
         x = payload.x or self.defaults.x,
         y = payload.y or self.defaults.y,
       },
-    }, self.cameraTarget)
+    }, self.cameraTarget, restartOptions(payload.restart, "camera.move"))
     return true
   elseif kind == "camera.reset" then
+    if payload.restart then
+      feel.clear(self.cameraTarget)
+    end
     feel.play({
       kind = "animate",
       duration = payload.duration or self.defaults.tweenDuration,
@@ -1231,7 +1287,7 @@ function Adapter:emit(event, ctx)
         scale = self.defaults.scale,
         rotation = self.defaults.rotation,
       },
-    }, self.cameraTarget)
+    }, self.cameraTarget, restartOptions(payload.restart, "camera.reset"))
     self.shake.remaining = 0
     self.shake.x = 0
     self.shake.y = 0
@@ -1268,11 +1324,11 @@ function Adapter:emit(event, ctx)
   elseif kind == "sound.resume" then
     return resumeSources(self.soundEntries[payload.cue])
   elseif kind == "sound.volume" then
-    return setSoundValue(self.soundEntries[payload.cue], "volume", payload.volume, payload.duration, payload.ease)
+    return setSoundValue(self.soundEntries[payload.cue], "volume", payload.volume, payload.duration, payload.ease, payload.restart)
   elseif kind == "sound.pitch" then
-    return setSoundValue(self.soundEntries[payload.cue], "pitch", payload.pitch, payload.duration, payload.ease)
+    return setSoundValue(self.soundEntries[payload.cue], "pitch", payload.pitch, payload.duration, payload.ease, payload.restart)
   elseif kind == "sound.pan" then
-    return setSoundValue(self.soundEntries[payload.cue], "pan", payload.pan, payload.duration, payload.ease)
+    return setSoundValue(self.soundEntries[payload.cue], "pan", payload.pan, payload.duration, payload.ease, payload.restart)
   elseif kind == "haptic.play" then
     local played = false
     local systemDuration = payload.duration or self.defaults.hapticDuration
@@ -1319,7 +1375,7 @@ function Adapter:emit(event, ctx)
   elseif kind == "shader.send" then
     return sendShaderValue(shaderEntry(self, payload), payload.uniform, payload.value)
   elseif kind == "shader.tween" then
-    return tweenShaderValue(shaderEntry(self, payload), payload.uniform, payload.value, payload.duration, payload.ease)
+    return tweenShaderValue(shaderEntry(self, payload), payload.uniform, payload.value, payload.duration, payload.ease, payload.restart)
   elseif kind == "shader.apply" then
     return applyShader(self, shaderEntry(self, payload))
   elseif kind == "shader.clear" then

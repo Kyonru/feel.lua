@@ -53,6 +53,8 @@ Sound control events use `emit`:
 
 Supported sound events are `sound.play`, `sound.stop`, `sound.pause`, `sound.resume`, `sound.volume`, `sound.pitch`, and `sound.pan`. Use `fx:stopSound(name)` or `fx:stopSounds()` for direct stop control.
 
+Sound control tweens stack by default. Add `restart = true` to replace the previous tween for the same cue/property.
+
 ## Sound Effect Recipes
 
 Fade a looping ambience cue in, then fade it out later:
@@ -257,13 +259,15 @@ Use `post.set` for immediate values, `post.tween` for timed parameter changes, a
 ```lua
 feel.define("impact.bloom", {
   { kind = "emit", event = "post.set", payload = { effect = "bloom", values = { threshold = 0.55 } } },
-  { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 1 }, duration = 0.12 } },
+  { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 1 }, duration = 0.12, restart = true } },
   { kind = "wait", duration = 0.16 },
-  { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 0 }, duration = 0.35 } },
+  { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 0 }, duration = 0.35, restart = true } },
 })
 ```
 
 Supported post events are `post.set`, `post.tween`, `post.enable`, `post.disable`, `post.weight`, and `post.clear`. Built-in effects are `bloom`, `chromatic`, `grade`, `lens`, and `vignette`; see [Post Processing](post-processing.md) for parameters and recipes.
+
+`post.tween` and `post.weight` stack by default. Add `restart = true` when the new tween should replace the previous tween for the same effect parameter.
 
 ## Camera And Screen
 

@@ -295,6 +295,39 @@ describe("feel.love", function()
     assert.are.same({ "setPosition", "hit", -0.4, 0, 0 }, calls[#calls])
   end)
 
+  it("can restart sound control tweens by cue and property", function()
+    local fx = feelLove.new()
+
+    fx:sound("hit", source("hit"))
+    calls = {}
+    fx:emit({ kind = "sound.volume", payload = { cue = "hit", volume = 0, duration = 1, restart = true } })
+    feel.update(0.5)
+    calls = {}
+    fx:emit({ kind = "sound.volume", payload = { cue = "hit", volume = 1, duration = 0.1, restart = true } })
+    feel.update(0.1)
+    local completedCalls = #calls
+    feel.update(1)
+
+    assert.are.equal(1, fx.soundEntries.hit.target.values.volume)
+    assert.are.equal(completedCalls, #calls)
+  end)
+
+  it("keeps stacking sound control tweens unless restart is requested", function()
+    local fx = feelLove.new()
+
+    fx:sound("hit", source("hit"))
+    calls = {}
+    fx:emit({ kind = "sound.volume", payload = { cue = "hit", volume = 0, duration = 1 } })
+    feel.update(0.5)
+    calls = {}
+    fx:emit({ kind = "sound.volume", payload = { cue = "hit", volume = 1, duration = 0.1 } })
+    feel.update(0.1)
+    local completedCalls = #calls
+    feel.update(1)
+
+    assert.is_true(#calls > completedCalls)
+  end)
+
   it("registers haptics and plays simple values across all targets", function()
     local fx = feelLove.new()
     local p1 = joystick("p1")
@@ -416,6 +449,31 @@ describe("feel.love", function()
     assert.is_true(fx.post.effects.chromatic.enabled)
     assert.are.equal(0.012, fx.post.effects.chromatic.target.values.x)
     assert.are.equal(-0.006, fx.post.effects.chromatic.target.values.y)
+  end)
+
+  it("can restart post tweens per effect property", function()
+    local fx = feelLove.new()
+
+    fx:emit({ kind = "post.tween", payload = { effect = "bloom", values = { intensity = 1, threshold = 0.2 }, duration = 1, restart = true } })
+    feel.update(0.5)
+    fx:emit({ kind = "post.tween", payload = { effect = "bloom", values = { intensity = 0 }, duration = 0.1, restart = true } })
+    feel.update(0.1)
+    feel.update(0.4)
+
+    assert.are.equal(0, fx.post.effects.bloom.target.values.intensity)
+    assert.are.equal(0.2, fx.post.effects.bloom.target.values.threshold)
+  end)
+
+  it("can restart post weight tweens", function()
+    local fx = feelLove.new()
+
+    fx:emit({ kind = "post.weight", payload = { value = 0, duration = 1, restart = true } })
+    feel.update(0.5)
+    fx:emit({ kind = "post.weight", payload = { value = 0.9, duration = 0.1, restart = true } })
+    feel.update(0.1)
+    feel.update(1)
+
+    assert.are.equal(0.9, fx.post.effects.volume.target.values.weight)
   end)
 
   it("drawPost captures and renders through post resources", function()
@@ -572,6 +630,23 @@ describe("feel.love", function()
 
     assert.are.equal(1, fx.shaderEntries.glow.values.amount)
     assert.are.same({ "send", "glow", "amount", 1 }, calls[#calls])
+  end)
+
+  it("can restart shader uniform tweens", function()
+    local fx = feelLove.new()
+
+    fx:shader("glow", shader("glow"), { uniforms = { amount = 0 } })
+    calls = {}
+    fx:emit({ kind = "shader.tween", payload = { name = "glow", uniform = "amount", value = 1, duration = 1, restart = true } })
+    feel.update(0.5)
+    calls = {}
+    fx:emit({ kind = "shader.tween", payload = { name = "glow", uniform = "amount", value = 0.25, duration = 0.1, restart = true } })
+    feel.update(0.1)
+    local completedCalls = #calls
+    feel.update(1)
+
+    assert.are.equal(0.25, fx.shaderEntries.glow.values.amount)
+    assert.are.equal(completedCalls, #calls)
   end)
 
   it("applies clears and restores shaders", function()

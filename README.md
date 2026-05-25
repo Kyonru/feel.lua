@@ -235,6 +235,8 @@ Plays a named sequence or an inline sequence.
 ```lua
 feel.play("hit.strong", target, {
   trigger = "attack",
+  restart = true,
+  key = "player.hit",
   emit = function(event, ctx) end,
   audio = function(event, ctx) end,
   markDirty = function(ctx) end,
@@ -242,6 +244,22 @@ feel.play("hit.strong", target, {
 ```
 
 `target` is optional for event-only sequences. If an animation step runs without a target, `feel.lua` creates an internal target.
+
+Pass `restart = true` to cancel the previous active run in the same target/key slot before starting the new one. `key` is optional for named sequences; inline sequences should pass a stable string key when they need restart behavior.
+
+Without restart, repeated plays stack:
+
+```lua
+feel.play("hit.strong", target)
+feel.play("hit.strong", target)
+```
+
+With restart, the second play replaces the first active run:
+
+```lua
+feel.play("hit.strong", target, { restart = true })
+feel.play("hit.strong", target, { restart = true })
+```
 
 ### `feel.update(dt)`
 
@@ -270,7 +288,7 @@ Run the demo from the repository root with LOVE:
 love examples/love2d
 ```
 
-The showcase uses left and right arrows to move between feature scenes for the full feedback stack, sound controls, particles, shaders, post-processing, haptics, and camera/screen adapter behavior.
+The showcase uses left and right arrows to move between feature scenes for the full feedback stack, restart behavior, sound controls, particles, shaders, post-processing, haptics, and camera/screen adapter behavior.
 
 ## LOVE Adapter
 
@@ -314,6 +332,8 @@ Register one cue with `fx:sound(name, sourceOrSources, opts)` or many cues with 
 `fx:handlers(extra)` plays `{ kind = "audio", cue = "hit" }` steps automatically, then calls `extra.audio(event, ctx)` if provided. Unknown cues are ignored by the adapter, so user callbacks can still handle them.
 
 Supported adapter events are `sound.play`, `sound.stop`, `sound.pause`, `sound.resume`, `sound.volume`, `sound.pitch`, `sound.pan`, `haptic.play`, `haptic.stop`, `haptic.vibrate`, `particle.emit`, `particle.start`, `particle.stop`, `particle.reset`, `particle.move`, `shader.send`, `shader.tween`, `shader.apply`, `shader.clear`, `post.set`, `post.tween`, `post.enable`, `post.disable`, `post.weight`, `post.clear`, `camera.shake`, `camera.zoom`, `camera.move`, `camera.reset`, `screen.flash`, `screen.fade`, and `screen.clear`.
+
+Tween-style LOVE adapter events stack by default. Add `restart = true` to payloads like `sound.volume`, `shader.tween`, `post.tween`, `post.weight`, `camera.zoom`, `camera.move`, or `camera.reset` when a new event should replace the previous tween for that adapter-controlled value.
 
 ```lua
 feel.define("slow.hit", {

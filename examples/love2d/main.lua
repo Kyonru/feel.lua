@@ -6,6 +6,7 @@ local shared = require("shared")
 
 local scenes = {
 	require("scenes.feedback_stack"),
+	require("scenes.restart"),
 	require("scenes.sound_controls"),
 	require("scenes.particles"),
 	require("scenes.shaders"),

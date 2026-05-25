@@ -36,6 +36,8 @@ feel.define("button.press", {
 ```lua
 feel.play("button.press", button, {
   trigger = "click",
+  restart = true,
+  key = "button.press",
   emit = function(event, ctx) end,
   audio = function(event, ctx) end,
   markDirty = function(ctx) end,
@@ -43,6 +45,22 @@ feel.play("button.press", button, {
 ```
 
 `target` is optional for event-only recipes. If an animation step runs without a target, the runner creates an internal target.
+
+Use `restart = true` when a new play should cancel the previous active play in the same target/key slot. Named sequences can omit `key`; inline sequences should pass a stable string key.
+
+Without restart, repeated plays stack:
+
+```lua
+feel.play("button.press", button)
+feel.play("button.press", button)
+```
+
+With restart, the second play replaces the first active run for that target/key:
+
+```lua
+feel.play("button.press", button, { restart = true })
+feel.play("button.press", button, { restart = true })
+```
 
 ## Update And Clear
 
