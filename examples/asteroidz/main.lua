@@ -14,12 +14,37 @@ local ship = require("ship")
 local asteroidsUtil = require("asteroids")
 local background = require("background")
 
+local ui = {
+	title = feel.target({ values = { scale = 1, glow = 0.25 } }),
+	score = feel.target({ values = { scale = 1, glow = 0 } }),
+	lives = feel.target({ values = { scale = 1, glow = 0 } }),
+	wave = feel.target({ values = { scale = 1, glow = 0 } }),
+	gameOver = feel.target({ values = { scale = 0.92, glow = 0 } }),
+}
+
+local function resetUi()
+	for _, target in pairs(ui) do
+		target.values.scale = 1
+		target.values.glow = 0
+	end
+	ui.title.values.glow = 0.25
+	ui.gameOver.values.scale = 0.92
+end
+
+local function pulseUi(target, scale, glow)
+	feel.play({
+		{ kind = "animate", duration = 0.06, to = { scale = scale or 1.18, glow = glow or 1 }, ease = "quadout" },
+		{ kind = "animate", duration = 0.24, to = { scale = 1, glow = 0 }, ease = "backout" },
+	}, target, { restart = true, key = target })
+end
+
 local function resetGame()
 	sequences.create()
 	state.reset()
 	constants.fx:reset()
 	ship:reset()
 	ship.lives = ship.max_lives
+	resetUi()
 end
 
 function love.load()
@@ -105,6 +130,7 @@ function love.update(dt)
 				table.remove(bullets, j)
 				asteroidsUtil.destroy(asteroids, i, bullet, function()
 					state.set("score", state.get("score") + math.floor(100 - asteroid.r))
+					pulseUi(ui.score, 1.22, 1)
 
 					emitParticles(asteroid.x, asteroid.y, palette.gold, math.floor(asteroid.r * 0.8), 170)
 					sequences.play(
@@ -121,7 +147,14 @@ function love.update(dt)
 	for _, asteroid in ipairs(asteroids) do
 		local radius = asteroid.r + 12
 		if math.distanceSquared(asteroid, ship) < radius * radius then
+			local previousLives = ship.lives
 			ship:hit()
+			if ship.lives < previousLives then
+				pulseUi(ui.lives, 1.24, 1)
+				if state.get("gameOver") then
+					pulseUi(ui.gameOver, 1.14, 1)
+				end
+			end
 			break
 		end
 	end
@@ -140,9 +173,30 @@ function love.update(dt)
 	if #asteroids == 0 and not gameOver then
 		state.set("wave", state.get("wave") + 1)
 		state.spawn_wave()
+		pulseUi(ui.wave, 1.22, 1)
 
 		constants.fx:emit({ kind = "screen.flash", payload = { color = palette.green, amount = 0.22, duration = 0.18 } })
 	end
+end
+
+local function drawPulsedText(text, x, y, base, target)
+	local v = target.values
+	local scale = v.scale or 1
+	local glow = v.glow or 0
+
+	love.graphics.push()
+	love.graphics.translate(x, y)
+	love.graphics.scale(scale)
+	if glow > 0 then
+		color(base, 0.18 * glow)
+		love.graphics.print(text, -2, 0)
+		love.graphics.print(text, 2, 0)
+		love.graphics.print(text, 0, -2)
+		love.graphics.print(text, 0, 2)
+	end
+	color(base)
+	love.graphics.print(text, 0, 0)
+	love.graphics.pop()
 end
 
 function love.draw()
@@ -183,18 +237,24 @@ function love.draw()
 	local wave = state.get("wave")
 	local gameOver = state.get("gameOver")
 
-	color(palette.line)
-	love.graphics.print("ASTEROIDZ", 28, 24)
+	drawPulsedText("ASTEROIDZ", 28, 24, palette.line, ui.title)
 	color(palette.muted)
 	love.graphics.print("arrows/WASD thrust + turn  |  space shoot  |  r restart", 28, 48)
-	color(palette.gold)
-	love.graphics.print("score " .. score, 28, 74)
-	love.graphics.print("lives " .. lives, 160, 74)
-	love.graphics.print("wave " .. wave, 270, 74)
+	drawPulsedText("score " .. score, 28, 74, palette.gold, ui.score)
+	drawPulsedText("lives " .. lives, 160, 74, lives <= 1 and palette.pink or palette.gold, ui.lives)
+	drawPulsedText("wave " .. wave, 270, 74, palette.green, ui.wave)
 
 	if gameOver then
+		local v = ui.gameOver.values
+		love.graphics.push()
+		love.graphics.translate(constants.W / 2, constants.H / 2 - 24)
+		love.graphics.scale(v.scale or 1)
+		color(palette.pink, 0.24 * (v.glow or 0))
+		love.graphics.printf("GAME OVER", -constants.W / 2 - 3, 0, constants.W, "center")
+		love.graphics.printf("GAME OVER", -constants.W / 2 + 3, 0, constants.W, "center")
 		color(palette.pink)
-		love.graphics.printf("GAME OVER", 0, constants.H / 2 - 24, constants.W, "center")
+		love.graphics.printf("GAME OVER", -constants.W / 2, 0, constants.W, "center")
+		love.graphics.pop()
 		color(palette.muted)
 		love.graphics.printf("press R to restart", 0, constants.H / 2 + 8, constants.W, "center")
 	end
