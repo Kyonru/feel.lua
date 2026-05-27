@@ -12,6 +12,14 @@ love examples/love2d
 
 The showcase uses left and right arrows to move between feature scenes. Each scene keeps its own sequences, targets, adapter instance, and local state.
 
+Run the standalone Asteroidz example:
+
+```sh
+love examples/asteroidz
+```
+
+Asteroidz is a small arcade game that uses `feel` sequences for thrust, shooting, asteroid hits, ship explosions, camera shake, screen flash, and procedural audio cues.
+
 ## Scenes
 
 - `scenes/feedback_stack.lua`: a full recipe stack with animation, audio, emit events, callbacks, particles, beams, shake, and flash.

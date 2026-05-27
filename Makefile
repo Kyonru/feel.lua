@@ -1,4 +1,4 @@
-.PHONY: help docs test example love2d
+.PHONY: help docs test example love2d asteroidz
 
 help:
 	@echo "Targets:"
@@ -6,6 +6,7 @@ help:
 	@echo "  test     Run Busted specs"
 	@echo "  example  Run the LOVE2D example"
 	@echo "  love2d   Alias for example"
+	@echo "  asteroidz Run the Asteroidz LOVE2D example"
 
 docs:
 	zensical serve
@@ -17,3 +18,6 @@ example:
 	love examples/love2d
 
 love2d: example
+
+asteroidz:
+	love examples/asteroidz

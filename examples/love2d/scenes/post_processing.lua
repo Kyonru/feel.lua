@@ -29,15 +29,27 @@ end
 
 local function defineSequences()
 	feel.define("post.bloom", {
-		{ kind = "emit", event = "post.set", payload = { effect = "bloom", values = { intensity = 0.25, threshold = 0.52, softness = 0.18 } } },
-		{ kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 2 }, duration = 0.12, ease = "quadout" } },
+		{
+			kind = "emit",
+			event = "post.set",
+			payload = { effect = "bloom", values = { intensity = 0.25, threshold = 0.52, softness = 0.18 } },
+		},
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = { effect = "bloom", values = { intensity = 2 }, duration = 0.12, ease = "quadout" },
+		},
 		{ kind = "audio", cue = "bloom" },
 		{ kind = "wait", duration = 0.16 },
-		{ kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 0 }, duration = 0.42, ease = "quadout" } },
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = { effect = "bloom", values = { intensity = 0 }, duration = 0.42, ease = "quadout" },
+		},
 		{
 			kind = "callback",
 			callback = function()
-		pulse(shared.palette.cyan)
+				pulse(shared.palette.cyan)
 			end,
 		},
 	})
@@ -101,14 +113,31 @@ local function defineSequences()
 	})
 
 	feel.define("post.lens", {
-		{ kind = "emit", event = "post.tween", payload = { effect = "lens", values = { distortion = 2 }, duration = 0.5, ease = "quadout" } },
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = { effect = "lens", values = { distortion = 2 }, duration = 0.5, ease = "quadout" },
+		},
 		{ kind = "audio", cue = "lens" },
 		{ kind = "wait", duration = 0.12 },
-		{ kind = "emit", event = "post.tween", payload = { effect = "lens", values = { distortion = 0 }, duration = 0.3, ease = "quadout" } },
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = { effect = "lens", values = { distortion = 0 }, duration = 0.3, ease = "quadout" },
+		},
 	})
 
 	feel.define("post.vignette", {
-		{ kind = "emit", event = "post.tween", payload = { effect = "vignette", values = { intensity = 0.78, radius = 0.62, softness = 0.24 }, duration = 0.24, ease = "quadout" } },
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = {
+				effect = "vignette",
+				values = { intensity = 0.78, radius = 0.62, softness = 0.24 },
+				duration = 0.24,
+				ease = "quadout",
+			},
+		},
 		{ kind = "audio", cue = "focus" },
 		{
 			kind = "callback",
@@ -136,14 +165,18 @@ local function playAction(index)
 		return
 	end
 
-	feel.play(action.sequence, nil, fx:handlers({
-		emit = function(event)
-			addLog("emit:" .. event.kind)
-		end,
-		audio = function(event)
-			addLog("audio:" .. event.cue)
-		end,
-	}))
+	feel.play(
+		action.sequence,
+		nil,
+		fx:handlers({
+			emit = function(event)
+				addLog("emit:" .. event.kind)
+			end,
+			audio = function(event)
+				addLog("audio:" .. event.cue)
+			end,
+		})
+	)
 end
 
 local function hitAction(x, y)
@@ -232,7 +265,13 @@ local function drawBrightStage()
 	shared.color(p.text)
 	love.graphics.printf("post-processing target", 112, 214, 816, "center")
 	shared.color(p.muted)
-	love.graphics.printf("Bloom, chromatic offset, grading, lens distortion, vignette, and global weight all run after this scene is captured.", 132, 386, 776, "center")
+	love.graphics.printf(
+		"Bloom, chromatic offset, grading, lens distortion, vignette, and global weight all run after this scene is captured.",
+		132,
+		386,
+		776,
+		"center"
+	)
 end
 
 local function drawMeters()
@@ -269,7 +308,11 @@ function Scene.draw(ctx)
 	shared.color(p.text)
 	love.graphics.print("post-processing as adapter state", 86, 120)
 	shared.color(p.muted)
-	love.graphics.print("Recipes tween full-screen shader parameters while the app keeps drawing a normal scene.", 86, 144)
+	love.graphics.print(
+		"Recipes tween full-screen shader parameters while the app keeps drawing a normal scene.",
+		86,
+		144
+	)
 
 	drawMeters()
 
