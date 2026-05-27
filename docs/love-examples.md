@@ -18,7 +18,7 @@ Run the standalone Asteroidz example:
 love examples/asteroidz
 ```
 
-Asteroidz is a small arcade game that uses `feel` sequences for thrust, shooting, asteroid hits, ship explosions, camera shake, screen flash, and procedural audio cues.
+Asteroidz is a small arcade game that uses `feel` sequences for thrust, shooting, asteroid hits, ship explosions, teleport bloom, HUD pulses, camera shake, screen flash, post-processing, and procedural audio cues. See the [Asteroidz Walkthrough](asteroidz.md) for how those pieces fit together.
 
 ## Scenes
 

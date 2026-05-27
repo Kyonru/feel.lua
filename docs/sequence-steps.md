@@ -6,12 +6,27 @@ icon: lucide/list-tree
 
 Each step is a table with a `kind`. Steps run in order unless a control-flow step changes how child steps are played.
 
+## Step Reference
+
+| Kind | Main fields | Purpose |
+| --- | --- | --- |
+| `animate` | `to`, `from`, `duration`, `ease`, `delay` | Tween numeric fields on `target.values`. |
+| `wait`, `pause` | `duration` or `time` | Delay the next step. |
+| `emit` | `event`, `name`, `payload` | Send a host-owned event to `opts.emit`. |
+| `audio` | `cue`, `audioKind` | Send an audio cue to `opts.audio`. |
+| `callback` | `callback` or `fn` | Run Lua code and continue. |
+| `log` | `message` or `text` | Log through `opts.log` or `print`. |
+| `play` | `name`, `sequence`, `steps`, `step`, `feedback` | Run one child sequence before continuing. |
+| `parallel` | `steps` or `sequences` | Run child sequences together, then continue. |
+| `repeat` | `count`, `times`, `forever`, plus child sequence fields | Run a child sequence repeatedly. |
+| `random` | `options` | Pick one weighted child option. |
+
 ## Animation And Timing
 
-`animate` tweens numeric fields on `target.values`.
+`animate` tweens numeric fields on `target.values`, including custom fields:
 
 ```lua
-{ kind = "animate", duration = 0.12, to = { x = 12, scale = 1.08 }, ease = "quadout" }
+{ kind = "animate", duration = 0.12, to = { x = 12, scale = 1.08, teleportGlow = 1 }, ease = "quadout" }
 ```
 
 Use `from` to set starting values before a tween, `delay` to delay a tween, and `onStart`, `onUpdate`, or `onComplete` hooks for step-local callbacks.
@@ -77,3 +92,5 @@ Use `from` to set starting values before a tween, `delay` to delay a tween, and 
   },
 }
 ```
+
+Use [LOVE Adapter](love-adapter.md) events when emitted events should control registered LOVE sounds, particles, shaders, camera, screen overlays, or post-processing.

@@ -57,7 +57,10 @@ nav = [
     { "Adapter Guide" = "love-adapter.md" },
     { "Post Processing" = "post-processing.md" },
   ] },
-  { "Examples" = "love-examples.md" },
+  { "Examples" = [
+    { "LOVE Examples" = "love-examples.md" },
+    { "Asteroidz Walkthrough" = "asteroidz.md" },
+  ] },
 ]
 
 # With the "extra_css" option you can add your own CSS styling to customize

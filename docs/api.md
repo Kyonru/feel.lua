@@ -4,15 +4,28 @@ icon: lucide/book-open
 
 # API
 
+## Core Functions
+
+| Function | Purpose |
+| --- | --- |
+| `feel.target(meta)` | Creates a target table with a tweenable `values` table. |
+| `feel.define(name, sequence)` | Stores a named sequence and returns the normalized sequence. |
+| `feel.get(name)` | Returns a previously defined sequence. |
+| `feel.play(nameOrSequence, target, opts)` | Plays a named or inline sequence. |
+| `feel.update(dt)` | Advances active tweens, waits, and child runners. |
+| `feel.clear(target)` | Clears all work, or only work attached to one target. |
+
 ## `feel.target(meta)`
 
 Creates a target table with a `values` table ready for animation.
 
 ```lua
-local target = feel.target({ values = { scale = 1 } })
+local target = feel.target({
+  values = { scale = 1, opacity = 1, teleportGlow = 0 },
+})
 ```
 
-The default animated fields are `opacity`, `x`, `y`, `scale`, `scaleX`, `scaleY`, and `rotation`.
+`values` may contain any numeric field. The built-in defaults are `opacity`, `x`, `y`, `scale`, `scaleX`, `scaleY`, and `rotation`; custom numeric fields like `teleportGlow` are preserved and can be tweened by `animate` steps.
 
 ## `feel.define(name, sequence)`
 
@@ -47,22 +60,23 @@ feel.play("hit.strong", target, {
 })
 ```
 
+| Option | Purpose |
+| --- | --- |
+| `trigger` | Label copied into emitted events and context. Defaults to `"manual"` unless inherited by child steps. |
+| `restart` | Cancels the previous active run in the same target/key slot before starting. |
+| `key` | Restart slot key. Named sequences can omit it; inline restartable sequences should pass one. |
+| `emit(event, ctx)` | Receives `emit` steps. |
+| `audio(event, ctx)` | Receives `audio` steps. |
+| `log(message, ctx)` | Receives `log` steps. |
+| `markDirty(ctx)` | Called by animation updates when provided. |
+
 `target` is optional for event-only sequences. If an animation step runs without a target, `feel.lua` creates an internal target.
 
-Pass `restart = true` to cancel the previous active run in the same target/key slot before starting the new one. `key` is optional for named sequences; inline sequences should pass a stable string key when they need restart behavior.
-
-Without restart, repeated plays stack:
+Without restart, repeated plays stack. With restart, the second play replaces the first active run for that target/key:
 
 ```lua
-feel.play("hit.strong", target)
-feel.play("hit.strong", target)
-```
-
-With restart, the second play replaces the first active run:
-
-```lua
-feel.play("hit.strong", target, { restart = true })
-feel.play("hit.strong", target, { restart = true })
+feel.play("hit.strong", target, { restart = true, key = "player.hit" })
+feel.play("hit.strong", target, { restart = true, key = "player.hit" })
 ```
 
 ## `feel.update(dt)`
@@ -86,7 +100,11 @@ feel.clear(target)
 
 ## Exposed Tables
 
-- `feel.fields`: default transform fields.
-- `feel.flux`: vendored Flux module.
-- `feel.normalizeStep`: step normalization helper.
-- `feel.normalizeSequence`: sequence normalization helper.
+| Export | Purpose |
+| --- | --- |
+| `feel.fields` | Default transform fields. |
+| `feel.flux` | Vendored Flux module. |
+| `feel.normalizeStep` | Step normalization helper. |
+| `feel.normalizeSequence` | Sequence normalization helper. |
+
+See [Core Runner](core-runner.md) for lifecycle details and [Sequence Steps](sequence-steps.md) for sequence table shapes.

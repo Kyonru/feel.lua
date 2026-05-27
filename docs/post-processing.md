@@ -17,6 +17,8 @@ function love.draw()
 end
 ```
 
+Only drawing inside `fx:drawPost(...)` is captured and processed. Draw HUD, menus, debug overlays, or `fx:drawOverlay()` afterward when they should stay crisp and unaffected by bloom, chromatic aberration, lens distortion, or grading.
+
 The pipeline is a LOVE adapter feature, so recipes use normal `emit` steps.
 
 ## Events
@@ -36,14 +38,14 @@ The pipeline is a LOVE adapter feature, so recipes use normal `emit` steps.
 
 ## Effects
 
-| Effect | Parameters |
-| --- | --- |
-| `bloom` | `intensity`, `threshold`, `softness` |
-| `chromatic` | `force`, `x`, `y` |
-| `grade` | `exposure`, `saturation`, `hueShift`, `contrast` |
-| `lens` | `distortion` |
-| `vignette` | `intensity`, `radius`, `softness` |
-| `volume` | `weight`, controlled through `post.weight` |
+| Effect | Parameters | Notes |
+| --- | --- | --- |
+| `bloom` | `intensity`, `threshold`, `softness`, `passes` | `passes` controls repeated blur rounds for a wider haze. |
+| `chromatic` | `force`, `x`, `y` | `x` and `y` are normalized screen-space offsets. |
+| `grade` | `exposure`, `saturation`, `hueShift`, `contrast` | Color and contrast shaping. |
+| `lens` | `distortion` | Radial lens warp. |
+| `vignette` | `intensity`, `radius`, `softness` | Darkens edges. |
+| `volume` | `weight` | Controlled through `post.weight`. |
 
 Processing order is fixed: color grade, lens distortion, chromatic aberration, bloom, vignette, then global weight blend.
 
@@ -55,12 +57,14 @@ Bloom impact:
 
 ```lua
 feel.define("impact.bloom", {
-  { kind = "emit", event = "post.set", payload = { effect = "bloom", values = { threshold = 0.55, softness = 0.18 } } },
+  { kind = "emit", event = "post.set", payload = { effect = "bloom", values = { threshold = 0.45, softness = 0.28, passes = 3 } } },
   { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 1.1 }, duration = 0.1, ease = "quadout", restart = true } },
   { kind = "wait", duration = 0.16 },
   { kind = "emit", event = "post.tween", payload = { effect = "bloom", values = { intensity = 0.25 }, duration = 0.35, ease = "quadout", restart = true } },
 })
 ```
+
+For a hazy bloom, lower `threshold`, raise `softness`, increase `passes`, and draw a bright source inside `fx:drawPost(...)`. Thin line art often needs a filled glow source behind it before bloom reads as a halo.
 
 Chromatic hit:
 

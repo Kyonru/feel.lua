@@ -25,6 +25,18 @@ feel.play("hit", target, fx:handlers({
 
 Unknown cues and events are no-ops for the adapter, so user callbacks can still own project-specific effects.
 
+## Event Summary
+
+| Area | Events |
+| --- | --- |
+| Sound | `sound.play`, `sound.stop`, `sound.pause`, `sound.resume`, `sound.volume`, `sound.pitch`, `sound.pan` |
+| Haptics | `haptic.play`, `haptic.stop`, `haptic.vibrate` |
+| Particles | `particle.emit`, `particle.start`, `particle.stop`, `particle.reset`, `particle.move` |
+| Shaders | `shader.send`, `shader.tween`, `shader.apply`, `shader.clear` |
+| Post | `post.set`, `post.tween`, `post.enable`, `post.disable`, `post.weight`, `post.clear` |
+| Camera | `camera.shake`, `camera.zoom`, `camera.move`, `camera.reset` |
+| Screen | `screen.flash`, `screen.fade`, `screen.clear` |
+
 ## Sound
 
 Register one cue with `fx:sound(name, sourceOrSources, opts)` or several with `fx:sounds(map)`.
@@ -254,6 +266,7 @@ function love.draw()
   fx:drawPost(function()
     drawWorld()
   end)
+  drawHud()
   fx:drawOverlay()
 end
 ```
@@ -272,6 +285,8 @@ feel.define("impact.bloom", {
 Supported post events are `post.set`, `post.tween`, `post.enable`, `post.disable`, `post.weight`, and `post.clear`. Built-in effects are `bloom`, `chromatic`, `grade`, `lens`, and `vignette`; see [Post Processing](post-processing.md) for parameters and recipes.
 
 `post.tween` and `post.weight` stack by default. Add `restart = true` when the new tween should replace the previous tween for the same effect parameter.
+
+Only drawing inside `fx:drawPost(...)` is processed. Draw HUD or adapter overlays afterward when they should stay readable.
 
 ## Camera And Screen
 

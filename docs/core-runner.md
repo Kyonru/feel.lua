@@ -13,11 +13,20 @@ Use `feel.target(meta)` when a sequence needs animated values.
 ```lua
 local button = feel.target({
   label = "Launch",
-  values = { x = 0, y = 0, scale = 1, opacity = 1 },
+  values = { x = 0, y = 0, scale = 1, opacity = 1, glow = 0 },
 })
 ```
 
-The default animated fields are `opacity`, `x`, `y`, `scale`, `scaleX`, `scaleY`, and `rotation`. You can still attach any metadata you want to the target table.
+The default transform fields are `opacity`, `x`, `y`, `scale`, `scaleX`, `scaleY`, and `rotation`. You can also add any numeric field your game wants to animate, such as `glow`, `shake`, `teleportGlow`, or `charge`.
+
+Metadata that is not inside `values` stays available on the target table, but it is not tweened:
+
+```lua
+local ship = feel.target({
+  kind = "player",
+  values = { scale = 1, teleportGlow = 0 },
+})
+```
 
 ## Named Sequences
 
@@ -71,3 +80,9 @@ feel.play("button.press", button, { restart = true })
 Call `feel.update(dt)` once per frame. It advances tweens, waits, nested sequences, repeat loops, and parallel branches.
 
 Use `feel.clear()` to clear all named sequences and active work. Use `feel.clear(target)` to stop active tweens and active sequences for one target.
+
+## Related Pages
+
+- [Sequence Steps](sequence-steps.md) describes every step shape.
+- [API](api.md) lists function signatures and option fields.
+- [LOVE Adapter](love-adapter.md) shows how emitted events become LOVE side effects.
