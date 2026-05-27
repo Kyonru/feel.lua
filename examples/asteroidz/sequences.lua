@@ -3,7 +3,7 @@ local constants = require("constants")
 local palette = require("colors").palette
 local effects = require("effects")
 local ship = require("ship")
-local pubSub = require("pubsub")
+local feedback = require("feedback")
 
 local function play_sequence(name, target, extra)
 	extra = extra or {}
@@ -31,6 +31,7 @@ end
 
 local function create_sequences()
 	feel.clear()
+	feedback:clear()
 
 	feel.define("ship.thrust", {
 		{ kind = "emit", event = "ship.trail" },
@@ -151,12 +152,17 @@ local function create_sequences()
 		},
 	})
 
-	pubSub:on("play_sequence", function(props)
-		play_sequence(props.name, props.target, props.extra)
+	feedback:on("ship.shoot", function(event)
+		play_sequence("ship.shoot", event.target, { restart = true, key = "ship.shoot" })
+	end)
+
+	feedback:on("ship.explode", function(event)
+		play_sequence("ship.explode", event.target, { restart = true, key = "ship.explode" })
 	end)
 end
 
 return {
 	create = create_sequences,
 	play = play_sequence,
+	feedback = feedback,
 }

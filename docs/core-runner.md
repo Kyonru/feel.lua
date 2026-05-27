@@ -75,6 +75,22 @@ feel.play("button.press", button, { restart = true })
 feel.play("button.press", button, { restart = true })
 ```
 
+## Feedback Channels
+
+Use `feel.channel()` when gameplay modules should announce feedback intents without importing the sequence module that handles them.
+
+```lua
+local feedback = feel.channel()
+
+feedback:on("ship.explode", function(event)
+  feel.play("ship.explode", event.target, { restart = true, key = "ship.explode" })
+end)
+
+feedback:emit("ship.explode", { target = ship.target })
+```
+
+Channels are local objects. Create them where they make module boundaries cleaner, and keep gameplay state changes direct.
+
 ## Update And Clear
 
 Call `feel.update(dt)` once per frame. It advances tweens, waits, nested sequences, repeat loops, and parallel branches.

@@ -18,6 +18,7 @@ love examples/asteroidz
 | --- | --- |
 | `examples/asteroidz/main.lua` | LOVE callbacks, world update, collision checks, drawing, HUD feedback. |
 | `examples/asteroidz/sequences.lua` | Named feedback recipes and adapter handlers. |
+| `examples/asteroidz/feedback.lua` | A local `feel.channel()` for feedback intents. |
 | `examples/asteroidz/ship.lua` | Ship state, shooting, damage, and ship drawing. |
 | `examples/asteroidz/state.lua` | Shared game state and wave spawning. |
 | `examples/asteroidz/effects.lua` | Simple particles and procedural tones. |
@@ -37,6 +38,34 @@ feel.define("ship.thrust", {
 ```
 
 `sequences.play` wraps `feel.play` with `constants.fx:handlers(...)`, so adapter-owned events such as `screen.flash`, `camera.shake`, `post.tween`, and `audio` cues can live beside app-owned events such as `ship.trail` and `spark`.
+
+## Feedback Intents
+
+Asteroidz uses a local feedback channel so gameplay modules do not need to import the sequence module directly.
+
+```lua
+-- feedback.lua
+local feel = require("feel")
+
+return feel.channel()
+```
+
+`ship.lua` announces what happened:
+
+```lua
+feedback:emit("ship.shoot", { target = self.target })
+feedback:emit("ship.explode", { target = self.target })
+```
+
+`sequences.lua` owns the mapping from those intents to recipes:
+
+```lua
+feedback:on("ship.shoot", function(event)
+  play_sequence("ship.shoot", event.target, { restart = true, key = "ship.shoot" })
+end)
+```
+
+This keeps gameplay state direct while decoupling feedback routing from ship logic.
 
 ## Teleport Bloom And Glow
 

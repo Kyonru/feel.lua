@@ -4,6 +4,7 @@
 ---@class FeelModule
 ---@field flux table
 ---@field fields string[]
+---@field channel fun(): FeelChannel
 local feel = {}
 
 ---@class FeelTargetMeta
@@ -139,8 +140,31 @@ local feel = {}
 ---@field message? string
 ---@field text? string
 
----@alias FeelStepKind '"animate"'|'"wait"'|'"pause"'|'"emit"'|'"audio"'|'"callback"'|'"play"'|'"parallel"'|'"repeat"'|'"random"'|'"log"'
----@alias FeelStep FeelAnimateStep|FeelWaitStep|FeelEmitStep|FeelAudioStep|FeelCallbackStep|FeelPlayStep|FeelParallelStep|FeelRepeatStep|FeelRandomStep|FeelLogStep|table
+---@class FeelFeedbackEvent
+---@field target? FeelTarget
+---@field opts? FeelPlayOptions
+---@field payload? any
+---@field [string] any
+
+---@alias FeelFeedbackHandler fun(event: FeelFeedbackEvent)
+
+---@class FeelChannel
+
+---@alias FeelStepKind
+---| '"animate"'
+---| '"wait"'
+---| '"pause"'
+---| '"emit"'
+---| '"audio"'
+---| '"callback"'
+---| '"play"'
+---| '"parallel"'
+---| '"repeat"'
+---| '"random"'
+---| '"log"'
+---@alias FeelSideEffectStep FeelEmitStep|FeelAudioStep|FeelCallbackStep|FeelLogStep
+---@alias FeelControlStep FeelPlayStep|FeelParallelStep|FeelRepeatStep|FeelRandomStep
+---@alias FeelStep FeelAnimateStep|FeelWaitStep|FeelSideEffectStep|FeelControlStep|table
 ---@alias FeelStepInput FeelStep|fun(ctx: FeelContext)|string|number|boolean|nil
 ---@alias FeelSequenceInput string|FeelStepInput|FeelStepInput[]|nil|false
 
@@ -171,6 +195,33 @@ function feel.update(dt) end
 
 ---@param target? FeelTarget
 function feel.clear(target) end
+
+---@return FeelChannel
+function feel.channel() end
+
+---@param intent string
+---@param handler FeelFeedbackHandler
+---@return fun()
+function FeelChannel:on(intent, handler) end
+
+---@param intent string
+---@param handler FeelFeedbackHandler
+---@return boolean
+function FeelChannel:off(intent, handler) end
+
+---@param intent string
+---@param event? FeelFeedbackEvent
+---@return integer
+function FeelChannel:emit(intent, event) end
+
+---@param intent string
+---@param sequence FeelSequenceInput
+---@param defaults? FeelFeedbackEvent
+---@return fun()
+function FeelChannel:map(intent, sequence, defaults) end
+
+---@param intent? string
+function FeelChannel:clear(intent) end
 
 ---@param step FeelStepInput
 ---@return FeelStep?

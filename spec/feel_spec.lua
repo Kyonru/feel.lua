@@ -416,6 +416,85 @@ describe("feel.lua", function()
     assert.are.same({ "child", "child" }, events)
   end)
 
+  it("channel subscribes emits and unsubscribes feedback intents", function()
+    local channel = feel.channel()
+    local calls = {}
+
+    local unsubscribe = channel:on("ship.shoot", function(event)
+      calls[#calls + 1] = event.payload.weapon
+    end)
+
+    assert.are.equal(1, channel:emit("ship.shoot", { payload = { weapon = "laser" } }))
+    unsubscribe()
+    assert.are.equal(0, channel:emit("ship.shoot", { payload = { weapon = "beam" } }))
+    assert.are.same({ "laser" }, calls)
+  end)
+
+  it("channel emits against a snapshot when listeners change during dispatch", function()
+    local channel = feel.channel()
+    local calls = {}
+    local unsubscribeSecond
+
+    channel:on("hit", function()
+      calls[#calls + 1] = "first"
+      unsubscribeSecond()
+    end)
+    unsubscribeSecond = channel:on("hit", function()
+      calls[#calls + 1] = "second"
+    end)
+
+    assert.are.equal(2, channel:emit("hit"))
+    assert.are.equal(1, channel:emit("hit"))
+    assert.are.same({ "first", "second", "first" }, calls)
+  end)
+
+  it("channel map plays sequences with default and event options", function()
+    local channel = feel.channel()
+    local target = feel.target()
+    local events = {}
+
+    feel.define("mapped.pulse", {
+      { kind = "animate", to = { x = 8 }, duration = 0.1 },
+      { kind = "emit", event = "done" },
+    })
+
+    channel:map("pulse", "mapped.pulse", {
+      target = target,
+      opts = {
+        restart = true,
+        key = "default",
+        emit = function(event)
+          events[#events + 1] = event.kind
+        end,
+      },
+    })
+
+    channel:emit("pulse", { opts = { key = "override" } })
+    feel.update(0.1)
+
+    assert.are.equal(8, target.values.x)
+    assert.are.same({ "done" }, events)
+  end)
+
+  it("channel clears one intent or all intents", function()
+    local channel = feel.channel()
+    local calls = {}
+
+    channel:on("a", function()
+      calls[#calls + 1] = "a"
+    end)
+    channel:on("b", function()
+      calls[#calls + 1] = "b"
+    end)
+
+    channel:clear("a")
+    assert.are.equal(0, channel:emit("a"))
+    assert.are.equal(1, channel:emit("b"))
+    channel:clear()
+    assert.are.equal(0, channel:emit("b"))
+    assert.are.same({ "b" }, calls)
+  end)
+
   it("loads from an arbitrary package prefix", function()
     local nestedPrefix = "lib.random.folder.feel"
     local loaders = package.searchers or package.loaders

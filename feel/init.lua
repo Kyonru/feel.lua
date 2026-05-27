@@ -20,6 +20,7 @@ local flux = require(prefix .. ".vendor.flux")
 ---@field play fun(nameOrSequence: FeelSequenceInput, target?: FeelTarget, opts?: FeelPlayOptions): FeelContext?
 ---@field update fun(dt?: number): boolean
 ---@field clear fun(target?: FeelTarget)
+---@field channel fun(): FeelChannel
 ---@type FeelModule
 local Feel = {}
 
@@ -173,6 +174,17 @@ local Feel = {}
 ---@field text? string
 ---@field [integer] any
 
+---@class FeelFeedbackEvent
+---@field target? FeelTarget
+---@field opts? FeelPlayOptions
+---@field payload? any
+---@field [string] any
+
+---@alias FeelFeedbackHandler fun(event: FeelFeedbackEvent)
+
+---@class FeelChannel
+---@field listeners table<string, FeelFeedbackHandler[]>
+
 ---@alias FeelStepKind
 ---| '"animate"'
 ---| '"wait"'
@@ -197,6 +209,8 @@ local targets = setmetatable({}, { __mode = "k" })
 local runners = {}
 local restartTargets = setmetatable({}, { __mode = "k" })
 local nilRestartSlots = {}
+local Channel = {}
+Channel.__index = Channel
 
 local FIELDS = {
   "opacity",
@@ -417,6 +431,104 @@ local function clearRestartSlot(runner)
   if runner and runner.restartSlot and runner.restartSlot[runner.restartKey] == runner then
     runner.restartSlot[runner.restartKey] = nil
   end
+end
+
+local function copyOptions(base, extra)
+  local result = {}
+  for key, value in pairs(base or {}) do
+    result[key] = value
+  end
+  for key, value in pairs(extra or {}) do
+    result[key] = value
+  end
+  return result
+end
+
+---@param intent string
+---@param handler FeelFeedbackHandler
+---@return fun()
+function Channel:on(intent, handler)
+  assert(type(intent) == "string", "intent must be a string")
+  assert(type(handler) == "function", "handler must be a function")
+
+  local list = self.listeners[intent]
+  if not list then
+    list = {}
+    self.listeners[intent] = list
+  end
+  list[#list + 1] = handler
+
+  return function()
+    self:off(intent, handler)
+  end
+end
+
+---@param intent string
+---@param handler FeelFeedbackHandler
+---@return boolean
+function Channel:off(intent, handler)
+  local list = self.listeners[intent]
+  if not list then
+    return false
+  end
+
+  for index = #list, 1, -1 do
+    if list[index] == handler then
+      table.remove(list, index)
+      if #list == 0 then
+        self.listeners[intent] = nil
+      end
+      return true
+    end
+  end
+
+  return false
+end
+
+---@param intent string
+---@param event? FeelFeedbackEvent
+---@return integer
+function Channel:emit(intent, event)
+  local list = self.listeners[intent]
+  if not list then
+    return 0
+  end
+
+  local snapshot = {}
+  for index = 1, #list do
+    snapshot[index] = list[index]
+  end
+
+  local payload = event or {}
+  for index = 1, #snapshot do
+    snapshot[index](payload)
+  end
+
+  return #snapshot
+end
+
+---@param intent string
+---@param sequence FeelSequenceInput
+---@param defaults? FeelFeedbackEvent
+---@return fun()
+function Channel:map(intent, sequence, defaults)
+  defaults = defaults or {}
+  return self:on(intent, function(event)
+    event = event or {}
+    local target = event.target ~= nil and event.target or defaults.target
+    local opts = copyOptions(defaults.opts, event.opts)
+    Feel.play(sequence, target, next(opts) and opts or nil)
+  end)
+end
+
+---@param intent? string
+---@return nil
+function Channel:clear(intent)
+  if intent then
+    self.listeners[intent] = nil
+    return
+  end
+  self.listeners = {}
 end
 
 local runSequence
@@ -898,6 +1010,11 @@ function Feel.clear(target)
   targets = setmetatable({}, { __mode = "k" })
   restartTargets = setmetatable({}, { __mode = "k" })
   nilRestartSlots = {}
+end
+
+---@return FeelChannel
+function Feel.channel()
+  return setmetatable({ listeners = {} }, Channel)
 end
 
 Feel.flux = flux

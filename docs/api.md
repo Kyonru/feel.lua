@@ -14,6 +14,7 @@ icon: lucide/book-open
 | `feel.play(nameOrSequence, target, opts)` | Plays a named or inline sequence. |
 | `feel.update(dt)` | Advances active tweens, waits, and child runners. |
 | `feel.clear(target)` | Clears all work, or only work attached to one target. |
+| `feel.channel()` | Creates a local feedback command channel. |
 
 ## `feel.target(meta)`
 
@@ -97,6 +98,30 @@ Clears registered sequences, active tween state, waits, nested sequences, repeat
 feel.clear()
 feel.clear(target)
 ```
+
+## `feel.channel()`
+
+Creates a local feedback command channel. Channels let gameplay code announce named feedback intents while another module maps those intents to `feel.play`, adapter events, targets, or app-specific side effects.
+
+```lua
+local feedback = feel.channel()
+
+feedback:on("ship.shoot", function(event)
+  feel.play("ship.shoot", event.target, { restart = true, key = "ship.shoot" })
+end)
+
+feedback:emit("ship.shoot", { target = ship.target })
+```
+
+| Method | Purpose |
+| --- | --- |
+| `channel:on(intent, handler)` | Register a handler and return an unsubscribe function. |
+| `channel:off(intent, handler)` | Remove one handler. |
+| `channel:emit(intent, event)` | Call handlers for one intent and return the number called. |
+| `channel:map(intent, sequence, defaults)` | Register a simple handler that plays a sequence. |
+| `channel:clear(intent)` | Clear one intent, or all handlers when `intent` is omitted. |
+
+Channels are intentionally small and local. They are for feedback routing, not general app state, entity messaging, networking, replay, or gameplay architecture.
 
 ## Exposed Tables
 

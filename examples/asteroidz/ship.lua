@@ -1,7 +1,7 @@
 local feel = require("feel")
 local constants = require("constants")
 local state = require("state")
-local pubSub = require("pubsub")
+local feedback = require("feedback")
 local palette = require("colors").palette
 local color = require("colors").color
 local emitParticles = require("effects").emitParticles
@@ -48,10 +48,8 @@ function ship:shoot()
 		life = 0.95,
 	}
 
-	pubSub:emit("play_sequence", {
-		name = "ship.shoot",
+	feedback:emit("ship.shoot", {
 		target = self.target,
-		extra = { restart = true, key = "ship.shoot" },
 	})
 end
 
@@ -63,10 +61,8 @@ function ship:hit()
 
 	self.lives = self.lives - 1
 	emitParticles(self.x, self.y, palette.pink, 42, 230)
-	pubSub:emit("play_sequence", {
-		name = "ship.explode",
+	feedback:emit("ship.explode", {
 		target = self.target,
-		extra = { restart = true, key = "ship.explode" },
 	})
 
 	if self.lives <= 0 then
