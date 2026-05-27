@@ -170,7 +170,7 @@ local SOUND_SETTERS = {
   pan = "setPosition",
 }
 local POST_DEFAULTS = {
-  bloom = { intensity = 0, threshold = 0.75, softness = 0.15 },
+  bloom = { intensity = 0, threshold = 0.75, softness = 0.15, passes = 1 },
   chromatic = { force = 0, x = 0, y = 0 },
   grade = { exposure = 0, saturation = 1, hueShift = 0, contrast = 1 },
   lens = { distortion = 0 },
@@ -1526,18 +1526,21 @@ function Adapter:drawPost(drawScene)
 
   local bloom = post.effects.bloom
   if bloom.enabled and (bloom.target.values.intensity or 0) > 0 then
+    local bloomPasses = math.max(1, math.floor(bloom.target.values.passes or bloom.defaults.passes or 1))
     renderPass(shaders.extract, current, canvases.bloomA, function(shader)
       sendShader(shader, "threshold", bloom.target.values.threshold or 0.75)
       sendShader(shader, "softness", bloom.target.values.softness or 0.15)
     end)
-    renderPass(shaders.blur, canvases.bloomA, canvases.bloomB, function(shader)
-      sendShader(shader, "direction", { 1, 0 })
-      sendShader(shader, "texel", { 1 / width, 1 / height })
-    end)
-    renderPass(shaders.blur, canvases.bloomB, canvases.bloomA, function(shader)
-      sendShader(shader, "direction", { 0, 1 })
-      sendShader(shader, "texel", { 1 / width, 1 / height })
-    end)
+    for _ = 1, bloomPasses do
+      renderPass(shaders.blur, canvases.bloomA, canvases.bloomB, function(shader)
+        sendShader(shader, "direction", { 1, 0 })
+        sendShader(shader, "texel", { 1 / width, 1 / height })
+      end)
+      renderPass(shaders.blur, canvases.bloomB, canvases.bloomA, function(shader)
+        sendShader(shader, "direction", { 0, 1 })
+        sendShader(shader, "texel", { 1 / width, 1 / height })
+      end)
+    end
     renderPass(shaders.bloom, current, nextCanvas, function(shader)
       sendShader(shader, "bloomTex", canvases.bloomA)
       sendShader(shader, "intensity", bloom.target.values.intensity or 0)

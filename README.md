@@ -52,14 +52,7 @@ end
 
 ## Docs
 
-- [Installation](docs/installation.md)
-- [Getting Started](docs/getting-started.md)
-- [API](docs/api.md)
-- [Core Runner](docs/core-runner.md)
-- [Sequence Steps](docs/sequence-steps.md)
-- [LOVE Adapter](docs/love-adapter.md)
-- [Post Processing](docs/post-processing.md)
-- [LOVE Examples](docs/love-examples.md)
+- [Guides](https://kyonru.github.io/feel.lua)
 
 ## How does it work?
 

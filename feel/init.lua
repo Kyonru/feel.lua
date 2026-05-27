@@ -213,7 +213,7 @@ local function copyNumericFields(source)
 end
 
 local function subject(values)
-  local result = {}
+  local result = copyNumericFields(values)
   values = values or {}
   for key, value in pairs(DEFAULTS) do
     result[key] = values[key] ~= nil and values[key] or value
