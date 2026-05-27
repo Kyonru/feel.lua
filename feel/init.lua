@@ -7,6 +7,8 @@ end
 
 local flux = require(prefix .. ".vendor.flux")
 
+---@module "feel"
+
 ---@class FeelModule
 ---@field flux table
 ---@field fields string[]
@@ -18,6 +20,7 @@ local flux = require(prefix .. ".vendor.flux")
 ---@field play fun(nameOrSequence: FeelSequenceInput, target?: FeelTarget, opts?: FeelPlayOptions): FeelContext?
 ---@field update fun(dt?: number): boolean
 ---@field clear fun(target?: FeelTarget)
+---@type FeelModule
 local Feel = {}
 
 ---@class FeelTargetMeta
@@ -170,7 +173,21 @@ local Feel = {}
 ---@field text? string
 ---@field [integer] any
 
----@alias FeelStep FeelAnimateStep|FeelWaitStep|FeelEmitStep|FeelAudioStep|FeelCallbackStep|FeelPlayStep|FeelParallelStep|FeelRepeatStep|FeelRandomStep|FeelLogStep|table
+---@alias FeelStepKind
+---| '"animate"'
+---| '"wait"'
+---| '"pause"'
+---| '"emit"'
+---| '"audio"'
+---| '"callback"'
+---| '"play"'
+---| '"parallel"'
+---| '"repeat"'
+---| '"random"'
+---| '"log"'
+---@alias FeelSideEffectStep FeelEmitStep|FeelAudioStep|FeelCallbackStep|FeelLogStep
+---@alias FeelControlStep FeelPlayStep|FeelParallelStep|FeelRepeatStep|FeelRandomStep
+---@alias FeelStep FeelAnimateStep|FeelWaitStep|FeelSideEffectStep|FeelControlStep|table
 ---@alias FeelStepInput FeelStep|fun(ctx: FeelContext)|string|number|boolean|nil
 ---@alias FeelSequenceInput string|FeelStepInput|FeelStepInput[]|nil|false
 

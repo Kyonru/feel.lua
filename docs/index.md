@@ -21,6 +21,7 @@ icon: lucide/scan-heart
 | [Core Runner](core-runner.md) | Targets, named sequences, playback, updates, clearing, and callback context. |
 | [Sequence Steps](sequence-steps.md) | `animate`, `emit`, `audio`, `wait`, `play`, `parallel`, `repeat`, `random`, `callback`, and `log`. |
 | [API](api.md) | Compact function signatures, options, and exported helpers. |
+| [Autocomplete](autocomplete.md) | LuaLS setup, local definition files, LOVE2D types, and custom target values. |
 | [LOVE Adapter](love-adapter.md) | Registered sound cues, haptics, particle systems, shaders, post-processing, camera events, screen overlays, and adapter handlers. |
 | [Post Processing](post-processing.md) | Built-in LOVE canvas effects, parameters, and recipes. |
 | [LOVE Examples](love-examples.md) | Showcase scenes and feature-specific examples. |

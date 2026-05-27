@@ -4,10 +4,14 @@ if moduleName and moduleName ~= "" then
   prefix = moduleName:gsub("%.love$", "")
 end
 
+---@type FeelModule
 local feel = require(prefix)
+
+---@module "feel.love"
 
 ---@class FeelLoveModule
 ---@field new fun(opts?: FeelLoveOptions): FeelLoveAdapter
+---@type FeelLoveModule
 local FeelLove = {}
 
 ---@class FeelLoveAdapter
@@ -130,6 +134,119 @@ Adapter.__index = Adapter
 ---@field values table<string, any>
 
 ---@alias FeelLovePostEffectName '"bloom"'|'"chromatic"'|'"grade"'|'"lens"'|'"vignette"'|'"volume"'
+---@alias FeelLoveSoundEventName
+---| '"sound.play"'
+---| '"sound.stop"'
+---| '"sound.pause"'
+---| '"sound.resume"'
+---| '"sound.volume"'
+---| '"sound.pitch"'
+---| '"sound.pan"'
+---@alias FeelLoveHapticEventName '"haptic.play"'|'"haptic.stop"'|'"haptic.vibrate"'
+---@alias FeelLoveParticleEventName
+---| '"particle.emit"'
+---| '"particle.start"'
+---| '"particle.stop"'
+---| '"particle.reset"'
+---| '"particle.move"'
+---@alias FeelLoveShaderEventName '"shader.send"'|'"shader.tween"'|'"shader.apply"'|'"shader.clear"'
+---@alias FeelLovePostEventName
+---| '"post.set"'
+---| '"post.tween"'
+---| '"post.enable"'
+---| '"post.disable"'
+---| '"post.weight"'
+---| '"post.clear"'
+---@alias FeelLoveCameraEventName '"camera.shake"'|'"camera.zoom"'|'"camera.move"'|'"camera.reset"'
+---@alias FeelLoveScreenEventName '"screen.flash"'|'"screen.fade"'|'"screen.clear"'
+---@alias FeelLoveCoreEventName FeelLoveSoundEventName|FeelLoveHapticEventName|FeelLoveParticleEventName
+---@alias FeelLoveVisualEventName FeelLoveShaderEventName|FeelLovePostEventName
+---@alias FeelLoveViewEventName FeelLoveCameraEventName|FeelLoveScreenEventName
+---@alias FeelLoveEventName FeelLoveCoreEventName|FeelLoveVisualEventName|FeelLoveViewEventName|string
+
+---@class FeelLoveBloomValues
+---@field intensity? number
+---@field threshold? number
+---@field softness? number
+---@field passes? number
+
+---@class FeelLoveChromaticValues
+---@field force? number
+---@field x? number
+---@field y? number
+
+---@class FeelLoveGradeValues
+---@field exposure? number
+---@field saturation? number
+---@field hueShift? number
+---@field contrast? number
+
+---@class FeelLoveLensValues
+---@field distortion? number
+
+---@class FeelLoveVignetteValues
+---@field intensity? number
+---@field radius? number
+---@field softness? number
+
+---@class FeelLoveVolumeValues
+---@field weight? number
+
+---@alias FeelLovePostVisualValues FeelLoveBloomValues|FeelLoveChromaticValues|FeelLoveGradeValues
+---@alias FeelLovePostShapeValues FeelLoveLensValues|FeelLoveVignetteValues|FeelLoveVolumeValues
+---@alias FeelLovePostValues FeelLovePostVisualValues|FeelLovePostShapeValues|table<string, number>
+
+---@class FeelLoveTimedPayload
+---@field duration? number
+---@field ease? string
+---@field restart? boolean
+
+---@class FeelLoveSoundPayload: FeelLoveTimedPayload
+---@field cue? string
+---@field volume? number
+---@field pitch? number
+---@field pan? number
+
+---@class FeelLoveHapticPayload
+---@field name? string
+---@field value? number
+---@field left? number
+---@field right? number
+---@field duration? number
+---@field system? boolean
+
+---@class FeelLoveParticlePayload
+---@field name? string
+---@field count? integer
+---@field x? number
+---@field y? number
+
+---@class FeelLoveShaderPayload: FeelLoveTimedPayload
+---@field name? string
+---@field uniform? string
+---@field value? any
+
+---@class FeelLovePostPayload: FeelLoveTimedPayload
+---@field effect? FeelLovePostEffectName
+---@field values? FeelLovePostValues
+---@field value? number
+
+---@class FeelLoveCameraPayload: FeelLoveTimedPayload
+---@field amount? number
+---@field frequency? number
+---@field scale? number
+---@field x? number
+---@field y? number
+
+---@class FeelLoveScreenPayload
+---@field color? number[]
+---@field amount? number
+---@field alpha? number
+---@field duration? number
+
+---@alias FeelLoveCorePayload FeelLoveSoundPayload|FeelLoveHapticPayload|FeelLoveParticlePayload
+---@alias FeelLoveVisualPayload FeelLoveShaderPayload|FeelLovePostPayload|FeelLoveCameraPayload|FeelLoveScreenPayload
+---@alias FeelLovePayload FeelLoveCorePayload|FeelLoveVisualPayload|table
 
 ---@class FeelLovePostEffect
 ---@field name FeelLovePostEffectName
@@ -150,11 +267,11 @@ Adapter.__index = Adapter
 ---@field restart? boolean
 
 ---@class FeelLoveEvent
----@field kind? string
----@field event? string
----@field name? string
+---@field kind? FeelLoveEventName
+---@field event? FeelLoveEventName
+---@field name? FeelLoveEventName|string
 ---@field cue? string
----@field payload? table
+---@field payload? FeelLovePayload
 
 ---@class FeelLoveHandlers
 ---@field emit? fun(event: FeelLoveEvent, ctx?: any)
@@ -1154,14 +1271,14 @@ function Adapter:popShader()
 end
 
 ---@param effect FeelLovePostEffectName
----@param values table<string, any>
+---@param values FeelLovePostValues
 ---@return boolean
 function Adapter:setPost(effect, values)
   return setPostValues(self, effect, values)
 end
 
 ---@param effect FeelLovePostEffectName
----@param values table<string, any>
+---@param values FeelLovePostValues
 ---@param opts? FeelLovePostTweenOptions
 ---@return boolean
 function Adapter:tweenPost(effect, values, opts)
