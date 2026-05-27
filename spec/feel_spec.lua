@@ -27,6 +27,61 @@ describe("feel.lua", function()
     assert.is_nil(feel.play("test.ping"))
   end)
 
+  it("validates named and inline sequences", function()
+    feel.define("valid.pulse", {
+      { kind = "animate", to = { scale = 1.2 }, duration = 0.1 },
+      { kind = "audio", cue = "pulse" },
+    })
+
+    local ok, err = feel.validate("valid.pulse")
+
+    assert.is_true(ok)
+    assert.is_nil(err)
+    assert.is_true(feel.validate({
+      { kind = "emit", event = "spark" },
+      { kind = "parallel", steps = {
+        { { kind = "wait", duration = 0.01 } },
+        { { kind = "audio", cue = "spark" } },
+      } },
+    }))
+  end)
+
+  it("reports useful validation errors for bad sequences", function()
+    local cases = {
+      {
+        sequence = { kind = "wobble" },
+        message = "unknown kind",
+      },
+      {
+        sequence = { kind = "animate", to = { scale = "big" } },
+        message = "to.scale: must be a number",
+      },
+      {
+        sequence = { kind = "parallel", steps = { left = { kind = "wait" } } },
+        message = "parallel step requires a non-empty array",
+      },
+      {
+        sequence = { kind = "random", options = {} },
+        message = "random step requires a non-empty options array",
+      },
+      {
+        sequence = { kind = "audio" },
+        message = "audio step requires cue",
+      },
+      {
+        sequence = "missing.sequence",
+        message = "unknown sequence 'missing.sequence'",
+      },
+    }
+
+    for _, case in ipairs(cases) do
+      local ok, err = feel.validate(case.sequence)
+
+      assert.is_false(ok)
+      assert.is_truthy(string.find(err, case.message, 1, true))
+    end
+  end)
+
   it("plays inline animation sequences through flux", function()
     local target = feel.target({ label = "Launch" })
     local dirty = 0
@@ -330,6 +385,48 @@ describe("feel.lua", function()
 
     assert.are.equal(1, target.values.x)
     assert.are.same({ "new" }, events)
+  end)
+
+  it("reports active runner snapshots", function()
+    local target = feel.target()
+
+    feel.define("debug.wait", {
+      { kind = "wait", duration = 1 },
+      { kind = "emit", event = "done" },
+    })
+
+    feel.play("debug.wait", target, { restart = true, key = "debug" })
+    feel.update(0.25)
+
+    local active = feel.active()
+    assert.are.equal(1, #active)
+    assert.are.equal(target, active[1].target)
+    assert.are.equal("debug.wait", active[1].source)
+    assert.are.equal("debug", active[1].key)
+    assert.are.equal(1, active[1].index)
+    assert.are.equal(2, active[1].count)
+    assert.are.equal(0.25, active[1].elapsed)
+    assert.is_true(active[1].waiting)
+    assert.are.equal(0.75, active[1].remaining)
+
+    active[1].index = 99
+    assert.are.equal(1, feel.active()[1].index)
+  end)
+
+  it("reports whether a target/key slot is playing", function()
+    local target = feel.target()
+
+    feel.play({
+      { kind = "wait", duration = 0.1 },
+    }, target, { restart = true, key = "pulse" })
+
+    assert.is_true(feel.isPlaying(target))
+    assert.is_true(feel.isPlaying(target, "pulse"))
+    assert.is_false(feel.isPlaying(target, "other"))
+
+    feel.update(0.1)
+
+    assert.is_false(feel.isPlaying(target, "pulse"))
   end)
 
   it("restart slots are scoped by target", function()

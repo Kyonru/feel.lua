@@ -42,6 +42,15 @@ feel.define("button.press", {
 
 `feel.get(name)` returns the normalized sequence.
 
+Use `feel.validate(sequence)` while authoring or loading recipes to catch common shape problems before playback:
+
+```lua
+local ok, err = feel.validate("button.press")
+if not ok then
+  print(err)
+end
+```
+
 ## Playback
 
 `feel.play(nameOrSequence, target, opts)` accepts a named sequence or inline sequence.
@@ -94,6 +103,18 @@ Channels are local objects. Create them where they make module boundaries cleane
 ## Update And Clear
 
 Call `feel.update(dt)` once per frame. It advances tweens, waits, nested sequences, repeat loops, and parallel branches.
+
+Use `feel.active()` and `feel.isPlaying(target, key)` as tiny debug helpers when restart slots, long waits, or nested sequences are hard to reason about:
+
+```lua
+for _, run in ipairs(feel.active()) do
+  print(run.source, run.key, run.index, run.count, run.remaining)
+end
+
+if feel.isPlaying(ship.target, "ship.teleport") then
+  print("teleport feedback is still active")
+end
+```
 
 Use `feel.clear()` to clear all named sequences and active work. Use `feel.clear(target)` to stop active tweens and active sequences for one target.
 

@@ -11,8 +11,11 @@ icon: lucide/book-open
 | `feel.target(meta)` | Creates a target table with a tweenable `values` table. |
 | `feel.define(name, sequence)` | Stores a named sequence and returns the normalized sequence. |
 | `feel.get(name)` | Returns a previously defined sequence. |
+| `feel.validate(sequence)` | Checks a sequence and returns `ok, err`. |
 | `feel.play(nameOrSequence, target, opts)` | Plays a named or inline sequence. |
 | `feel.update(dt)` | Advances active tweens, waits, and child runners. |
+| `feel.active()` | Returns debug snapshots for active sequence runners. |
+| `feel.isPlaying(target, key)` | Returns whether a target/key slot is currently active. |
 | `feel.clear(target)` | Clears all work, or only work attached to one target. |
 | `feel.channel()` | Creates a local feedback command channel. |
 
@@ -45,6 +48,23 @@ Returns a previously defined sequence.
 ```lua
 local sequence = feel.get("hit.strong")
 ```
+
+## `feel.validate(sequence)`
+
+Checks a named or inline sequence without playing it. It returns `true` when the sequence looks valid, or `false, err` with the first authoring problem it finds.
+
+```lua
+local ok, err = feel.validate({
+  { kind = "animate", to = { scale = 1.2 }, duration = 0.08 },
+  { kind = "audio", cue = "hit" },
+})
+
+if not ok then
+  print(err)
+end
+```
+
+Validation catches common mistakes: unknown step kinds, non-numeric animation fields, malformed `parallel.steps`, empty `random.options`, missing audio cues, missing child sequences, and unknown named sequences.
 
 ## `feel.play(nameOrSequence, target, opts)`
 
@@ -89,6 +109,37 @@ feel.update(dt)
 ```
 
 Returns whether there was active work before or after the update.
+
+## `feel.active()`
+
+Returns a snapshot array for debugging active runners. The returned tables are copies, so changing them does not change the scheduler.
+
+```lua
+for _, run in ipairs(feel.active()) do
+  print(run.source, run.key, run.index, run.count, run.remaining)
+end
+```
+
+| Field | Purpose |
+| --- | --- |
+| `target` | Target attached to the run, when any. |
+| `source` | Named sequence string or inline sequence value passed to `feel.play`. |
+| `trigger` | Current trigger label. |
+| `key` | Restart key, when the run was started with `restart = true`. |
+| `index` / `count` | Current step index and total normalized steps. |
+| `elapsed` | Seconds since this runner started. |
+| `waiting` / `remaining` | Whether the runner is in a wait step, and seconds left when it is. |
+| `tweens` / `children` | Number of active tweens and child runners owned by this runner. |
+
+## `feel.isPlaying(target, key)`
+
+Returns `true` when an active runner matches `target` and, when provided, `key`.
+
+```lua
+if feel.isPlaying(ship.target, "ship.teleport") then
+  -- avoid stacking a manual teleport effect
+end
+```
 
 ## `feel.clear(target)`
 

@@ -6,6 +6,7 @@ elseif prefix:sub(-5) == ".init" then
 end
 
 local flux = require(prefix .. ".vendor.flux")
+local validator = require(prefix .. ".validate")
 
 ---@module "feel"
 
@@ -17,8 +18,11 @@ local flux = require(prefix .. ".vendor.flux")
 ---@field target fun(meta?: FeelTargetMeta): FeelTarget
 ---@field define fun(name: string, sequence: FeelSequenceInput): FeelStep[]?
 ---@field get fun(name: string): FeelStep[]?
+---@field validate fun(sequence: FeelSequenceInput): boolean, string?
 ---@field play fun(nameOrSequence: FeelSequenceInput, target?: FeelTarget, opts?: FeelPlayOptions): FeelContext?
 ---@field update fun(dt?: number): boolean
+---@field active fun(): FeelActiveRun[]
+---@field isPlaying fun(target?: FeelTarget, key?: string|number|table): boolean
 ---@field clear fun(target?: FeelTarget)
 ---@field channel fun(): FeelChannel
 ---@type FeelModule
@@ -74,9 +78,23 @@ local Feel = {}
 ---@field tweens table[]
 ---@field parent? FeelRunner
 ---@field wait? FeelWaitState
+---@field elapsed number
 ---@field cancelled? boolean
 ---@field restartSlot? table
 ---@field restartKey? string|number|table
+
+---@class FeelActiveRun
+---@field target? FeelTarget
+---@field source any
+---@field trigger string
+---@field key? string|number|table
+---@field index integer
+---@field count integer
+---@field elapsed number
+---@field waiting boolean
+---@field remaining? number
+---@field tweens integer
+---@field children integer
 
 ---@class FeelWaitState
 ---@field remaining number
@@ -336,6 +354,10 @@ local function normalizeSequence(value)
 
   return { normalizeStep(value) }
 end
+
+local validateSequence = validator.new(normalizeStep, function(name)
+  return registry[name]
+end)
 
 local function stateFor(target)
   target = target or Feel.target()
@@ -868,6 +890,7 @@ runSequence = function(nameOrSequence, target, opts, done, meta)
     done = done,
     children = {},
     tweens = {},
+    elapsed = 0,
     restartSlot = restartSlot,
     restartKey = restartKey,
   }
@@ -935,6 +958,13 @@ function Feel.get(name)
   return registry[name]
 end
 
+---@param sequence FeelSequenceInput
+---@return boolean ok
+---@return string? err
+function Feel.validate(sequence)
+  return validateSequence(sequence)
+end
+
 ---@param nameOrSequence FeelSequenceInput
 ---@param target? FeelTarget
 ---@param opts? FeelPlayOptions
@@ -956,6 +986,9 @@ function Feel.update(dt)
 
   for index = #runners, 1, -1 do
     local runner = runners[index]
+    if runner then
+      runner.elapsed = (runner.elapsed or 0) + dt
+    end
     local wait = runner and runner.wait
     if wait then
       wait.remaining = wait.remaining - dt
@@ -967,6 +1000,47 @@ function Feel.update(dt)
   end
 
   return hadActive or #group > 0 or #runners > 0
+end
+
+---@return FeelActiveRun[]
+function Feel.active()
+  local active = {}
+
+  for _, runner in ipairs(runners) do
+    if runner and not runner.cancelled then
+      local wait = runner.wait
+      active[#active + 1] = {
+        target = runner.ctx and runner.ctx.target or nil,
+        source = runner.ctx and runner.ctx.source or nil,
+        trigger = runner.ctx and runner.ctx.trigger or "manual",
+        key = runner.restartKey,
+        index = runner.index or 0,
+        count = #(runner.sequence or {}),
+        elapsed = runner.elapsed or 0,
+        waiting = wait ~= nil,
+        remaining = wait and wait.remaining or nil,
+        tweens = #(runner.tweens or {}),
+        children = #(runner.children or {}),
+      }
+    end
+  end
+
+  return active
+end
+
+---@param target? FeelTarget
+---@param key? string|number|table
+---@return boolean
+function Feel.isPlaying(target, key)
+  for _, runner in ipairs(runners) do
+    if runner and not runner.cancelled and runner.ctx and runner.ctx.target == target then
+      if key == nil or runner.restartKey == key then
+        return true
+      end
+    end
+  end
+
+  return false
 end
 
 local function clearTarget(target)

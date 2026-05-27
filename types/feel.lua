@@ -4,6 +4,9 @@
 ---@class FeelModule
 ---@field flux table
 ---@field fields string[]
+---@field active fun(): FeelActiveRun[]
+---@field isPlaying fun(target?: FeelTarget, key?: string|number|table): boolean
+---@field validate fun(sequence: FeelSequenceInput): boolean, string?
 ---@field channel fun(): FeelChannel
 local feel = {}
 
@@ -54,7 +57,21 @@ local feel = {}
 ---@field index integer
 ---@field children FeelRunner[]
 ---@field tweens table[]
+---@field elapsed number
 ---@field cancelled? boolean
+
+---@class FeelActiveRun
+---@field target? FeelTarget
+---@field source any
+---@field trigger string
+---@field key? string|number|table
+---@field index integer
+---@field count integer
+---@field elapsed number
+---@field waiting boolean
+---@field remaining? number
+---@field tweens integer
+---@field children integer
 
 ---@class FeelAnimateStep
 ---@field kind "animate"
@@ -181,6 +198,11 @@ function feel.define(name, sequence) end
 ---@return FeelStep[]?
 function feel.get(name) end
 
+---@param sequence FeelSequenceInput
+---@return boolean ok
+---@return string? err
+function feel.validate(sequence) end
+
 ---@overload fun(name: string, target?: FeelTarget, opts?: FeelPlayOptions): FeelContext?
 ---@overload fun(sequence: FeelSequenceInput, target?: FeelTarget, opts?: FeelPlayOptions): FeelContext?
 ---@param nameOrSequence FeelSequenceInput
@@ -192,6 +214,14 @@ function feel.play(nameOrSequence, target, opts) end
 ---@param dt? number
 ---@return boolean
 function feel.update(dt) end
+
+---@return FeelActiveRun[]
+function feel.active() end
+
+---@param target? FeelTarget
+---@param key? string|number|table
+---@return boolean
+function feel.isPlaying(target, key) end
 
 ---@param target? FeelTarget
 function feel.clear(target) end
