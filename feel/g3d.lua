@@ -30,6 +30,19 @@ local MODEL_DEFAULTS = {
   ry = 0,
   rz = 0,
   scale = 1,
+  offsetX = 0,
+  offsetY = 0,
+  offsetZ = 0,
+  shakeX = 0,
+  shakeY = 0,
+  shakeZ = 0,
+  rotationOffsetX = 0,
+  rotationOffsetY = 0,
+  rotationOffsetZ = 0,
+  fxScale = 1,
+  fxScaleX = 1,
+  fxScaleY = 1,
+  fxScaleZ = 1,
 }
 
 local CAMERA_DEFAULTS = {
@@ -41,6 +54,43 @@ local CAMERA_DEFAULTS = {
   tz = 0,
   direction = 0,
   pitch = 0,
+  shakeX = 0,
+  shakeY = 0,
+  shakeZ = 0,
+  heightKick = 0,
+  yawKick = 0,
+  targetOffsetX = 0,
+  targetOffsetY = 0,
+  targetOffsetZ = 0,
+  fovKick = 0,
+}
+
+local MODEL_FEEDBACK_RESET = {
+  offsetX = 0,
+  offsetY = 0,
+  offsetZ = 0,
+  shakeX = 0,
+  shakeY = 0,
+  shakeZ = 0,
+  rotationOffsetX = 0,
+  rotationOffsetY = 0,
+  rotationOffsetZ = 0,
+  fxScale = 1,
+  fxScaleX = 1,
+  fxScaleY = 1,
+  fxScaleZ = 1,
+}
+
+local CAMERA_FEEDBACK_RESET = {
+  shakeX = 0,
+  shakeY = 0,
+  shakeZ = 0,
+  heightKick = 0,
+  yawKick = 0,
+  targetOffsetX = 0,
+  targetOffsetY = 0,
+  targetOffsetZ = 0,
+  fovKick = 0,
 }
 
 local function copyMeta(opts, defaults)
@@ -80,15 +130,121 @@ local function maybeCall(object, method, ...)
   return false
 end
 
+local function targetOptions(payload, key)
+  payload = payload or {}
+  return {
+    restart = payload.restart ~= false,
+    key = payload.key or key,
+  }
+end
+
+local function playTarget(target, sequence, payload, key)
+  feel.play(sequence, target, targetOptions(payload, key))
+  return true
+end
+
+local function radians(value, payload)
+  value = value or 0
+  if payload and payload.radians then
+    return value
+  end
+  return math.rad(value)
+end
+
+local function setNowStep(values)
+  return {
+    kind = "callback",
+    callback = function(ctx)
+      local target = ctx and ctx.target
+      if not target or not target.values then
+        return
+      end
+      for key, value in pairs(values) do
+        target.values[key] = value
+      end
+    end,
+  }
+end
+
+local function animateOrSet(values, duration, ease)
+  duration = duration or 0
+  if duration <= 0 then
+    return setNowStep(values)
+  end
+  return {
+    kind = "animate",
+    duration = duration,
+    ease = ease,
+    to = values,
+  }
+end
+
+local function pulseSequence(values, resetValues, payload)
+  payload = payload or {}
+  return {
+    animateOrSet(values, payload.duration or 0.08, payload.ease or "quadout"),
+    animateOrSet(resetValues, payload.returnDuration or 0.18, payload.returnEase or payload.ease or "backout"),
+  }
+end
+
+local function randomShakeSequence(fields, payload)
+  payload = payload or {}
+  local amount = payload.amount or 0.1
+  local duration = payload.duration or 0.14
+  local frequency = payload.frequency or 32
+  local count = math.max(1, math.floor(duration * frequency))
+  local stepDuration = duration / count
+  local sequence = {}
+  local reset = {}
+
+  for _, field in ipairs(fields) do
+    reset[field.name] = 0
+  end
+
+  for _ = 1, count do
+    local to = {}
+    for _, field in ipairs(fields) do
+      local fieldAmount = field.amount or amount
+      to[field.name] = (math.random() * 2 - 1) * fieldAmount
+    end
+    sequence[#sequence + 1] = {
+      kind = "animate",
+      duration = stepDuration,
+      ease = payload.ease or "linear",
+      to = to,
+    }
+  end
+
+  sequence[#sequence + 1] = animateOrSet(
+    reset,
+    payload.returnDuration or math.min(0.06, stepDuration),
+    payload.returnEase or "quadout"
+  )
+  return sequence
+end
+
 local function applyModel(entry)
   local values = entry.target.values
   local scale = values.scale or 1
-  local sx = values.sx or scale
-  local sy = values.sy or scale
-  local sz = values.sz or scale
+  local fxScale = values.fxScale or 1
+  local sx = (values.sx or scale) * fxScale * (values.fxScaleX or 1)
+  local sy = (values.sy or scale) * fxScale * (values.fxScaleY or 1)
+  local sz = (values.sz or scale) * fxScale * (values.fxScaleZ or 1)
 
-  maybeCall(entry.model, "setTranslation", values.x or 0, values.y or 0, values.z or 0)
-  maybeCall(entry.model, "setRotation", values.rx or 0, values.ry or 0, values.rz or 0)
+  maybeCall(
+    entry.model,
+    "setTranslation",
+    (values.x or 0) + (values.offsetX or 0) + (values.shakeX or 0),
+    (values.y or 0) + (values.offsetY or 0) + (values.shakeY or 0),
+    (values.z or 0) + (values.offsetZ or 0) + (values.shakeZ or 0)
+  )
+  maybeCall(
+    entry.model,
+    "setRotation",
+    (values.rx or 0) + (values.rotationOffsetX or 0),
+    (values.ry or 0) + (values.rotationOffsetY or 0),
+    (values.rz or 0) + (values.rotationOffsetZ or 0)
+  )
   maybeCall(entry.model, "setScale", sx, sy, sz)
 end
 
@@ -98,13 +254,24 @@ local function applyCamera(entry, camera)
   end
 
   local values = entry.target.values
+  local x = (values.x or 0) + (values.shakeX or 0)
+  local y = (values.y or 0) + (values.shakeY or 0)
+  local z = (values.z or 0) + (values.shakeZ or 0) + (values.heightKick or 0)
+
+  if camera.fov ~= nil or values.fovKick ~= 0 then
+    camera.fov = (values.fov or entry.baseFov or camera.fov or math.pi / 2) + (values.fovKick or 0)
+    if type(camera.updateProjectionMatrix) == "function" then
+      camera.updateProjectionMatrix()
+    end
+  end
+
   if entry.mode == "direction" then
     if type(camera.lookInDirection) == "function" then
       camera.lookInDirection(
-        values.x or 0,
-        values.y or 0,
-        values.z or 0,
-        values.direction or 0,
+        x,
+        y,
+        z,
+        (values.direction or 0) + (values.yawKick or 0),
         values.pitch or 0
       )
       return true
@@ -113,7 +280,14 @@ local function applyCamera(entry, camera)
   end
 
   if type(camera.lookAt) == "function" then
-    camera.lookAt(values.x or 0, values.y or 0, values.z or 0, values.tx or 0, values.ty or 0, values.tz or 0)
+    camera.lookAt(
+      x,
+      y,
+      z,
+      (values.tx or 0) + (values.targetOffsetX or 0),
+      (values.ty or 0) + (values.targetOffsetY or 0),
+      (values.tz or 0) + (values.targetOffsetZ or 0)
+    )
     return true
   end
 
@@ -164,6 +338,7 @@ function Adapter:camera(opts)
   local entry = {
     mode = opts.mode or "lookAt",
     target = target,
+    baseFov = opts.baseFov or opts.fov or (self.g3d.camera and self.g3d.camera.fov),
   }
   self.cameraEntry = entry
   applyCamera(entry, self.g3d.camera)
@@ -253,6 +428,98 @@ function Adapter:emit(event, ctx)
     if camera and type(camera.resize) == "function" then
       camera.resize(payload.width, payload.height)
       return true, ctx
+    end
+  elseif kind == "g3d.camera.shake" then
+    if self.cameraEntry then
+      return playTarget(self.cameraEntry.target, randomShakeSequence({
+        { name = "shakeX", amount = payload.xAmount or payload.amount },
+        { name = "shakeY", amount = payload.yAmount or payload.amount },
+        { name = "shakeZ", amount = payload.zAmount or payload.amount },
+      }, payload), payload, "g3d.camera.shake"), ctx
+    end
+  elseif kind == "g3d.camera.fov" then
+    if self.cameraEntry then
+      local amount = payload.value or radians(payload.amount or 0, payload)
+      local sequence = pulseSequence({ fovKick = amount }, { fovKick = 0 }, payload)
+      return playTarget(self.cameraEntry.target, sequence, payload, "g3d.camera.fov"), ctx
+    end
+  elseif kind == "g3d.camera.height" then
+    if self.cameraEntry then
+      local amount = payload.value or payload.amount or payload.height or 0
+      local sequence = pulseSequence({ heightKick = amount }, { heightKick = 0 }, payload)
+      return playTarget(self.cameraEntry.target, sequence, payload, "g3d.camera.height"), ctx
+    end
+  elseif kind == "g3d.camera.yaw" then
+    if self.cameraEntry then
+      local amount = payload.value or radians(payload.amount or 0, payload)
+      local sequence = pulseSequence({ yawKick = amount }, { yawKick = 0 }, payload)
+      return playTarget(self.cameraEntry.target, sequence, payload, "g3d.camera.yaw"), ctx
+    end
+  elseif kind == "g3d.camera.targetOffset" then
+    if self.cameraEntry then
+      local values = {
+        targetOffsetX = payload.x or payload.offsetX or 0,
+        targetOffsetY = payload.y or payload.offsetY or 0,
+        targetOffsetZ = payload.z or payload.offsetZ or 0,
+      }
+      return playTarget(self.cameraEntry.target, pulseSequence(values, {
+        targetOffsetX = 0,
+        targetOffsetY = 0,
+        targetOffsetZ = 0,
+      }, payload), payload, "g3d.camera.targetOffset"), ctx
+    end
+  elseif kind == "g3d.camera.reset" then
+    if self.cameraEntry then
+      return playTarget(self.cameraEntry.target, {
+        animateOrSet(CAMERA_FEEDBACK_RESET, payload.duration or 0, payload.ease),
+      }, payload, "g3d.camera.reset"), ctx
+    end
+  elseif kind == "g3d.model.scalePunch" then
+    local entry = payload.name and self.modelEntries[payload.name] or nil
+    if entry then
+      local scale = payload.scale or (1 + (payload.amount or 0.18))
+      local sequence = pulseSequence({ fxScale = scale }, { fxScale = 1 }, payload)
+      return playTarget(entry.target, sequence, payload, "g3d.model.scalePunch." .. payload.name), ctx
+    end
+  elseif kind == "g3d.model.squash" then
+    local entry = payload.name and self.modelEntries[payload.name] or nil
+    if entry then
+      local amount = payload.amount or 0.18
+      local values = {
+        fxScaleX = payload.sx or payload.xScale or (1 + amount),
+        fxScaleY = payload.sy or payload.yScale or (1 + amount),
+        fxScaleZ = payload.sz or payload.zScale or (1 - amount),
+      }
+      return playTarget(entry.target, pulseSequence(values, {
+        fxScaleX = 1,
+        fxScaleY = 1,
+        fxScaleZ = 1,
+      }, payload), payload, "g3d.model.squash." .. payload.name), ctx
+    end
+  elseif kind == "g3d.model.positionShake" then
+    local entry = payload.name and self.modelEntries[payload.name] or nil
+    if entry then
+      return playTarget(entry.target, randomShakeSequence({
+        { name = "shakeX", amount = payload.xAmount or payload.amount },
+        { name = "shakeY", amount = payload.yAmount or payload.amount },
+        { name = "shakeZ", amount = payload.zAmount or payload.amount },
+      }, payload), payload, "g3d.model.positionShake." .. payload.name), ctx
+    end
+  elseif kind == "g3d.model.rotationShake" then
+    local entry = payload.name and self.modelEntries[payload.name] or nil
+    if entry then
+      return playTarget(entry.target, randomShakeSequence({
+        { name = "rotationOffsetX", amount = payload.xAmount or payload.amount },
+        { name = "rotationOffsetY", amount = payload.yAmount or payload.amount },
+        { name = "rotationOffsetZ", amount = payload.zAmount or payload.amount },
+      }, payload), payload, "g3d.model.rotationShake." .. payload.name), ctx
+    end
+  elseif kind == "g3d.model.reset" then
+    local entry = payload.name and self.modelEntries[payload.name] or nil
+    if entry then
+      return playTarget(entry.target, {
+        animateOrSet(MODEL_FEEDBACK_RESET, payload.duration or 0, payload.ease),
+      }, payload, "g3d.model.reset." .. payload.name), ctx
     end
   end
 

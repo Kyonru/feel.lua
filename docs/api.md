@@ -19,6 +19,8 @@ icon: lucide/book-open
 | `feel.clear(target)` | Clears all work, or only work attached to one target. |
 | `feel.channel()` | Creates a local feedback command channel. |
 
+For More Mountains-style named feedback stacks, use the optional [`feel.feedbacks`](feedbacks.md) authoring layer on top of these core functions.
+
 ## `feel.target(meta)`
 
 Creates a target table with a `values` table ready for animation.

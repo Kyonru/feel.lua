@@ -39,6 +39,23 @@ describe("feel.g3d", function()
     }
   end
 
+  local function g3dWithProjection()
+    return {
+      camera = {
+        fov = math.pi / 2,
+        lookAt = function(x, y, z, tx, ty, tz)
+          calls[#calls + 1] = { "lookAtCamera", x, y, z, tx, ty, tz }
+        end,
+        lookInDirection = function(x, y, z, direction, pitch)
+          calls[#calls + 1] = { "lookInDirection", x, y, z, direction, pitch }
+        end,
+        updateProjectionMatrix = function()
+          calls[#calls + 1] = { "updateProjectionMatrix" }
+        end,
+      },
+    }
+  end
+
   before_each(function()
     feel.clear()
     calls = {}
@@ -104,6 +121,28 @@ describe("feel.g3d", function()
     assert.are.same({ "lookInDirection", 1, 2, 3, 0.9, -0.2 }, calls[1])
   end)
 
+  it("applies additive camera feedback values and fov kick", function()
+    local world = g3dWithProjection()
+    local fx = feelG3d.new(world)
+    local target = fx:camera({
+      mode = "lookAt",
+      values = { x = 1, y = -8, z = 4, tx = 2, ty = 3, tz = 4 },
+    })
+
+    target.values.shakeX = 0.25
+    target.values.shakeY = -0.5
+    target.values.shakeZ = 0.75
+    target.values.heightKick = 0.4
+    target.values.targetOffsetX = 0.1
+    target.values.fovKick = 0.2
+    calls = {}
+    fx:update()
+
+    assert.are.equal(math.pi / 2 + 0.2, world.camera.fov)
+    assert.are.same({ "updateProjectionMatrix" }, calls[1])
+    assert.are.same({ "lookAtCamera", 1.25, -8.5, 5.15, 2.1, 3, 4 }, calls[2])
+  end)
+
   it("handles g3d emit events and delegates unknown events", function()
     local fx = feelG3d.new(g3d())
     local seen = {}
@@ -134,6 +173,47 @@ describe("feel.g3d", function()
       "g3d.camera.resize",
       "g3d.unknown",
     }, seen)
+  end)
+
+  it("handles camera feedback events through the camera target", function()
+    local world = g3dWithProjection()
+    local fx = feelG3d.new(world)
+    local target = fx:camera({
+      values = { x = 0, y = -6, z = 3, tx = 0, ty = 0, tz = 0 },
+    })
+
+    fx:emit({ kind = "g3d.camera.fov", payload = { amount = 5, duration = 0.01, returnDuration = 0.1 } })
+    feel.update(0.01)
+    fx:update()
+
+    assert.is_true(math.abs(target.values.fovKick - math.rad(5)) < 0.000001)
+    assert.is_true(math.abs(world.camera.fov - (math.pi / 2 + math.rad(5))) < 0.000001)
+
+    fx:emit({ kind = "g3d.camera.reset", payload = { duration = 0 } })
+    assert.are.equal(0, target.values.fovKick)
+    assert.are.equal(0, target.values.heightKick)
+  end)
+
+  it("handles model feedback events through additive target values", function()
+    local fx = feelG3d.new(g3d())
+    local target = fx:model("ship", model("ship"))
+
+    calls = {}
+    fx:emit({
+      kind = "g3d.model.scalePunch",
+      payload = { name = "ship", amount = 0.5, duration = 0.01, returnDuration = 0.1 },
+    })
+    feel.update(0.01)
+    fx:update()
+    assert.are.equal(1.5, target.values.fxScale)
+    assert.are.same({ "setScale", "ship", 1.5, 1.5, 1.5 }, calls[3])
+
+    target.values.shakeX = 0.2
+    target.values.rotationOffsetZ = 0.3
+    fx:emit({ kind = "g3d.model.reset", payload = { name = "ship", duration = 0 } })
+    assert.are.equal(1, target.values.fxScale)
+    assert.are.equal(0, target.values.shakeX)
+    assert.are.equal(0, target.values.rotationOffsetZ)
   end)
 
   it("clears named and all bindings", function()

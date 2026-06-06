@@ -3,10 +3,12 @@ package.path = "?.lua;?/init.lua;../../?.lua;../../?/init.lua;vendor/?.lua;vendo
 local feel = require("feel")
 local feelLove = require("feel.love")
 local feelG3d = require("feel.g3d")
+local createFeedbacks = require("feedbacks")
 local g3d = require("vendor.g3d")
 
 local fx
 local g3dfx
+local Feedbacks
 local shipModel
 local floorModel
 local leftRockModel
@@ -21,6 +23,7 @@ local lookTargets
 local lookIndex = 0
 local currentLookTarget
 local time = 0
+local timeMode = "normal"
 local logs = {}
 
 local colors = {
@@ -32,6 +35,11 @@ local colors = {
 	pink = { 1, 0.27, 0.68 },
 	gold = { 1, 0.74, 0.22 },
 	green = { 0.24, 1, 0.58 },
+}
+
+local timeButtons = {
+	{ mode = "slow", label = "SLOW", color = colors.gold, x = 0, y = 0, w = 96, h = 30 },
+	{ mode = "pause", label = "PAUSE", color = colors.pink, x = 0, y = 0, w = 112, h = 30 },
 }
 
 local function log(message)
@@ -80,151 +88,80 @@ local function setColor(color, alpha)
 	love.graphics.setColor(color[1], color[2], color[3], alpha or color[4] or 1)
 end
 
-local function defineSequences()
-	feel.define("ship.hit", {
-		{ kind = "animate", duration = 0.06, to = { scale = 1.34, rz = 0.22 }, ease = "quadout" },
-		{ kind = "animate", duration = 0.22, to = { scale = 1, rz = 0 }, ease = "backout" },
-	})
-
-	feel.define("camera.punch", {
-		{ kind = "animate", duration = 0.08, to = { y = -5.15, z = 2.75 }, ease = "quadout" },
-		{ kind = "animate", duration = 0.34, to = { y = -6.4, z = 3.2 }, ease = "backout" },
-	})
-
-	feel.define("rock.bounce", {
-		{ kind = "animate", duration = 0.09, to = { z = 0.2, scale = 1.22 }, ease = "quadout" },
-		{ kind = "animate", duration = 0.26, to = { z = -0.15, scale = 1 }, ease = "bounceout" },
-	})
-
-	feel.define("post.impact", {
-		{
-			kind = "emit",
-			event = "post.set",
-			payload = {
-				effect = "bloom",
-				values = { intensity = 0.35, threshold = 0.28, softness = 0.34, passes = 3 },
-			},
-		},
-		{
-			kind = "emit",
-			event = "post.tween",
-			payload = { effect = "bloom", values = { intensity = 1.85 }, duration = 0.08, ease = "quadout", restart = true },
-		},
-		{
-			kind = "emit",
-			event = "post.tween",
-			payload = {
-				effect = "chromatic",
-				values = { force = 1, x = 0.01, y = -0.006 },
-				duration = 0.07,
-				ease = "quadout",
-				restart = true,
-			},
-		},
-		{
-			kind = "emit",
-			event = "post.tween",
-			payload = { effect = "lens", values = { distortion = 0.42 }, duration = 0.08, ease = "quadout", restart = true },
-		},
-		{ kind = "emit", event = "screen.flash", payload = { amount = 0.16, duration = 0.12, color = { 0.2, 0.8, 1, 1 } } },
-		{ kind = "wait", duration = 0.14 },
-		{
-			kind = "emit",
-			event = "post.tween",
-			payload = { effect = "bloom", values = { intensity = 0.22 }, duration = 0.36, ease = "quadout", restart = true },
-		},
-		{
-			kind = "emit",
-			event = "post.tween",
-			payload = {
-				effect = "chromatic",
-				values = { force = 0, x = 0, y = 0 },
-				duration = 0.22,
-				ease = "quadout",
-				restart = true,
-			},
-		},
-		{
-			kind = "emit",
-			event = "post.tween",
-			payload = { effect = "lens", values = { distortion = 0 }, duration = 0.22, ease = "quadout", restart = true },
-		},
-	})
-
-	feel.define("post.focus", {
-		{
-			kind = "emit",
-			event = "post.tween",
-			payload = {
-				effect = "vignette",
-				values = { intensity = 0.72, radius = 0.68, softness = 0.22 },
-				duration = 0.22,
-				ease = "quadout",
-				restart = true,
-			},
-		},
-		{
-			kind = "emit",
-			event = "post.tween",
-			payload = {
-				effect = "grade",
-				values = { exposure = 1.06, saturation = 1.32, hueShift = 0.06, contrast = 0.58 },
-				duration = 0.24,
-				ease = "quadout",
-				restart = true,
-			},
-		},
-		{ kind = "wait", duration = 1.2 },
-		{
-			kind = "emit",
-			event = "post.tween",
-			payload = {
-				effect = "vignette",
-				values = { intensity = 0.18, radius = 0.8, softness = 0.42 },
-				duration = 0.45,
-				ease = "quadout",
-				restart = true,
-			},
-		},
-		{
-			kind = "emit",
-			event = "post.tween",
-			payload = {
-				effect = "grade",
-				values = { exposure = 1, saturation = 1, hueShift = 0, contrast = 0.4 },
-				duration = 0.45,
-				ease = "quadout",
-				restart = true,
-			},
-		},
-	})
-
-	feel.define("post.clear", {
-		{ kind = "emit", event = "post.clear", payload = {} },
-		{ kind = "emit", event = "screen.clear", payload = {} },
-	})
+local function layoutTimeButtons(width)
+	local gap = 10
+	local x = width - 44
+	for index = #timeButtons, 1, -1 do
+		local button = timeButtons[index]
+		x = x - button.w
+		button.x = x
+		button.y = 104
+		x = x - gap
+	end
 end
 
-local function postHandlers(key)
-	return fx:handlers({
+local function buttonContains(button, x, y)
+	return x >= button.x and x <= button.x + button.w and y >= button.y and y <= button.y + button.h
+end
+
+local function timeButtonLabel(button)
+	if button.mode == "slow" and timeMode == "slow" then
+		return "NORMAL"
+	end
+	if button.mode == "pause" and timeMode == "pause" then
+		return "RESUME"
+	end
+	return button.label
+end
+
+local function setTimeMode(mode)
+	if not Feedbacks then
+		return
+	end
+
+	timeMode = mode
+	Feedbacks.play("time." .. mode, nil, {
+		target = Feedbacks.timeTarget(),
 		restart = true,
-		key = key,
-		emit = function(event)
-			if event.kind ~= "screen.flash" then
-				log("post: " .. event.kind)
-			end
-		end,
+		key = "demo.time",
 	})
+
+	if mode == "slow" then
+		log("time: slow motion")
+	elseif mode == "pause" then
+		log("time: paused")
+	else
+		log("time: normal")
+	end
+end
+
+local function toggleTimeMode(mode)
+	if mode == "slow" then
+		setTimeMode(timeMode == "slow" and "normal" or "slow")
+	elseif mode == "pause" then
+		setTimeMode(timeMode == "pause" and "normal" or "pause")
+	end
+end
+
+local function clickTimeButton(x, y)
+	layoutTimeButtons(love.graphics.getWidth())
+	for _, button in ipairs(timeButtons) do
+		if buttonContains(button, x, y) then
+			toggleTimeMode(button.mode)
+			return true
+		end
+	end
+	return false
 end
 
 local function playImpact()
-	feel.play("ship.hit", ship, { restart = true, key = "ship.hit" })
-	feel.play("camera.punch", camera, { restart = true, key = "camera.punch" })
-	feel.play("rock.bounce", leftRock, { restart = true, key = "left.bounce" })
-	feel.play("rock.bounce", rightRock, { restart = true, key = "right.bounce" })
-	feel.play("rock.bounce", rearRock, { restart = true, key = "rear.bounce" })
-	feel.play("post.impact", nil, postHandlers("post.impact"))
-	log("feel.play: model wobble + camera punch")
+	Feedbacks.play("hit.heavy", {
+		name = "ship",
+		x = ship.values.x,
+		y = ship.values.y,
+		z = ship.values.z,
+	}, { restart = true, key = "hit.heavy" })
+	log("Feedbacks.play: hit.heavy")
 end
 
 local function applyLookTarget()
@@ -256,17 +193,17 @@ local function faceNextTarget()
 		return
 	end
 
-	feel.play({
-		{ kind = "emit", event = "g3d.model.lookAt", payload = { name = "ship", x = target.x, y = target.y, z = target.z } },
-	}, nil, g3dfx:handlers({
-		emit = function(event)
-			log("look: " .. target.label .. " (" .. event.kind .. ")")
-		end,
-	}))
+	Feedbacks.play("ship.lookAt", {
+		name = "ship",
+		x = target.x,
+		y = target.y,
+		z = target.z,
+	}, { restart = true, key = "ship.lookAt" })
+	log("look: " .. target.label)
 end
 
 local function playFocusPost()
-	feel.play("post.focus", nil, postHandlers("post.focus"))
+	Feedbacks.play("post.focus", nil, { restart = true, key = "post.focus" })
 	log("post: focus grade + vignette")
 end
 
@@ -303,7 +240,8 @@ local function resetDemo()
 	currentLookTarget = nil
 
 	g3dfx:update()
-	feel.play("post.clear", nil, postHandlers("post.clear"))
+	setTimeMode("normal")
+	Feedbacks.play("demo.reset", nil, { restart = true, key = "demo.reset" })
 	log("reset targets")
 end
 
@@ -348,17 +286,24 @@ function love.load()
 		{ label = "main pose", reset = true },
 	}
 
-	defineSequences()
+	Feedbacks = createFeedbacks({
+		fx = fx,
+		g3dfx = g3dfx,
+		colors = colors,
+		log = log,
+	})
 	log("space/click: feedback pulse")
 	log("L: cycle look objectives")
+	log("1: slow time, 2: pause time")
 end
 
 function love.update(dt)
-	time = time + dt
+	local gameDt = dt * (Feedbacks and Feedbacks.timeScale() or 1)
+	time = time + gameDt
 	ship.values.ry = math.sin(time * 0.7) * 0.24
-	leftRock.values.rz = leftRock.values.rz + dt * 0.35
-	rightRock.values.rz = rightRock.values.rz - dt * 0.28
-	rearRock.values.rz = rearRock.values.rz + dt * 0.22
+	leftRock.values.rz = leftRock.values.rz + gameDt * 0.35
+	rightRock.values.rz = rightRock.values.rz - gameDt * 0.28
+	rearRock.values.rz = rearRock.values.rz + gameDt * 0.22
 
 	feel.update(dt)
 	g3dfx:update()
@@ -392,18 +337,29 @@ local function drawOverlay()
 	local active = feel.active()
 	local width = love.graphics.getWidth()
 	local height = love.graphics.getHeight()
+	layoutTimeButtons(width)
 
 	setColor(colors.panel)
-	love.graphics.rectangle("fill", 24, 24, width - 48, 118, 8, 8)
+	love.graphics.rectangle("fill", 24, 24, width - 48, 152, 8, 8)
 	setColor(colors.text)
 	love.graphics.print("feel.lua + groverburger/g3d", 44, 42)
 	setColor(colors.muted)
 	love.graphics.print(
-		"SPACE/click hits. L cycles look-at. P plays grade/vignette. C clears post. HUD stays outside drawPost.",
+		"SPACE/click hits. L look-at. P focus. C clears post. 1 slow time. 2 pause. HUD stays outside drawPost.",
 		44,
 		68
 	)
 	love.graphics.print("Active runners: " .. tostring(#active), 44, 94)
+	love.graphics.print("Time scale: " .. string.format("%.2f", Feedbacks and Feedbacks.timeScale() or 1), 220, 94)
+
+	for _, button in ipairs(timeButtons) do
+		local buttonActive = timeMode == button.mode
+		setColor(buttonActive and button.color or colors.panel, buttonActive and 0.86 or 0.72)
+		love.graphics.rectangle("fill", button.x, button.y, button.w, button.h, 6, 6)
+		setColor(buttonActive and colors.text or button.color)
+		love.graphics.rectangle("line", button.x, button.y, button.w, button.h, 6, 6)
+		love.graphics.printf(timeButtonLabel(button), button.x, button.y + 8, button.w, "center")
+	end
 
 	setColor(colors.panel)
 	love.graphics.rectangle("fill", 24, height - 132, width - 48, 104, 8, 8)
@@ -422,8 +378,11 @@ function love.draw()
 	drawOverlay()
 end
 
-function love.mousepressed(_, _, button)
+function love.mousepressed(x, y, button)
 	if button == 1 then
+		if clickTimeButton(x, y) then
+			return
+		end
 		playImpact()
 	end
 end
@@ -436,8 +395,12 @@ function love.keypressed(key)
 	elseif key == "p" then
 		playFocusPost()
 	elseif key == "c" then
-		feel.play("post.clear", nil, postHandlers("post.clear"))
+		Feedbacks.play("post.clear", nil, { restart = true, key = "post.clear" })
 		log("post: clear")
+	elseif key == "1" then
+		toggleTimeMode("slow")
+	elseif key == "2" then
+		toggleTimeMode("pause")
 	elseif key == "r" then
 		resetDemo()
 	elseif key == "escape" then

@@ -20,9 +20,11 @@ local feelG3d = {}
 ---@field lookAt? fun(self: FeelG3dModelLike, target: number[], up?: number[])
 
 ---@class FeelG3dCameraLike
+---@field fov? number
 ---@field lookAt? fun(x: number, y: number, z: number, tx: number, ty: number, tz: number)
 ---@field lookInDirection? fun(x?: number, y?: number, z?: number, direction?: number, pitch?: number)
 ---@field resize? fun(width?: number, height?: number)
+---@field updateProjectionMatrix? fun()
 
 ---@class FeelG3dModelOptions
 ---@field values? FeelG3dModelValues
@@ -39,6 +41,19 @@ local feelG3d = {}
 ---@field sy? number
 ---@field sz? number
 ---@field scale? number
+---@field offsetX? number
+---@field offsetY? number
+---@field offsetZ? number
+---@field shakeX? number
+---@field shakeY? number
+---@field shakeZ? number
+---@field rotationOffsetX? number
+---@field rotationOffsetY? number
+---@field rotationOffsetZ? number
+---@field fxScale? number
+---@field fxScaleX? number
+---@field fxScaleY? number
+---@field fxScaleZ? number
 ---@field [string] number
 
 ---@class FeelG3dCameraOptions
@@ -55,6 +70,15 @@ local feelG3d = {}
 ---@field tz? number
 ---@field direction? number
 ---@field pitch? number
+---@field shakeX? number
+---@field shakeY? number
+---@field shakeZ? number
+---@field heightKick? number
+---@field yawKick? number
+---@field targetOffsetX? number
+---@field targetOffsetY? number
+---@field targetOffsetZ? number
+---@field fovKick? number
 ---@field [string] number
 
 ---@class FeelG3dModelEntry
@@ -65,12 +89,24 @@ local feelG3d = {}
 ---@class FeelG3dCameraEntry
 ---@field mode "lookAt"|"direction"
 ---@field target FeelTarget
+---@field baseFov? number
 
 ---@alias FeelG3dEventName
 ---| '"g3d.model.lookAt"'
 ---| '"g3d.camera.lookAt"'
 ---| '"g3d.camera.direction"'
 ---| '"g3d.camera.resize"'
+---| '"g3d.camera.shake"'
+---| '"g3d.camera.fov"'
+---| '"g3d.camera.height"'
+---| '"g3d.camera.yaw"'
+---| '"g3d.camera.targetOffset"'
+---| '"g3d.camera.reset"'
+---| '"g3d.model.scalePunch"'
+---| '"g3d.model.squash"'
+---| '"g3d.model.positionShake"'
+---| '"g3d.model.rotationShake"'
+---| '"g3d.model.reset"'
 
 ---@class FeelG3dModelLookAtPayload
 ---@field name? string
@@ -98,8 +134,80 @@ local feelG3d = {}
 ---@field width? number
 ---@field height? number
 
+---@class FeelG3dCameraShakePayload
+---@field amount? number
+---@field xAmount? number
+---@field yAmount? number
+---@field zAmount? number
+---@field duration? number
+---@field frequency? number
+---@field returnDuration? number
+---@field ease? string
+---@field returnEase? string
+---@field restart? boolean
+---@field key? string
+
+---@class FeelG3dCameraPulsePayload
+---@field amount? number
+---@field value? number
+---@field height? number
+---@field duration? number
+---@field returnDuration? number
+---@field ease? string
+---@field returnEase? string
+---@field radians? boolean
+---@field restart? boolean
+---@field key? string
+
+---@class FeelG3dCameraTargetOffsetPayload
+---@field x? number
+---@field y? number
+---@field z? number
+---@field offsetX? number
+---@field offsetY? number
+---@field offsetZ? number
+---@field duration? number
+---@field returnDuration? number
+---@field ease? string
+---@field returnEase? string
+---@field restart? boolean
+---@field key? string
+
+---@class FeelG3dModelPulsePayload
+---@field name? string
+---@field amount? number
+---@field scale? number
+---@field sx? number
+---@field sy? number
+---@field sz? number
+---@field xScale? number
+---@field yScale? number
+---@field zScale? number
+---@field duration? number
+---@field returnDuration? number
+---@field ease? string
+---@field returnEase? string
+---@field restart? boolean
+---@field key? string
+
+---@class FeelG3dModelShakePayload
+---@field name? string
+---@field amount? number
+---@field xAmount? number
+---@field yAmount? number
+---@field zAmount? number
+---@field duration? number
+---@field frequency? number
+---@field returnDuration? number
+---@field ease? string
+---@field returnEase? string
+---@field restart? boolean
+---@field key? string
+
 ---@alias FeelG3dPayload FeelG3dModelLookAtPayload|FeelG3dCameraLookAtPayload
----| FeelG3dCameraDirectionPayload|FeelG3dCameraResizePayload|table
+---| FeelG3dCameraDirectionPayload|FeelG3dCameraResizePayload
+---| FeelG3dCameraShakePayload|FeelG3dCameraPulsePayload|FeelG3dCameraTargetOffsetPayload
+---| FeelG3dModelPulsePayload|FeelG3dModelShakePayload|table
 
 ---@class FeelG3dEvent
 ---@field kind? FeelG3dEventName|string

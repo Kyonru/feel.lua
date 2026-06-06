@@ -9,6 +9,7 @@
 - Animates lightweight target values.
 - Emits host-owned events for particles, camera shake, flashes, sounds, haptics, shaders, and more.
 - Runs steps in order, including waits, nested sequences, repeats, random branches, and parallel groups.
+- Optionally groups adapter events into named feedback stacks with `feel.feedbacks`.
 
 https://github.com/user-attachments/assets/6b15a87f-5a11-42f6-922b-ccf8bd0627f7
 
@@ -105,6 +106,22 @@ end
 ## Docs
 
 - [Guides](https://kyonru.github.io/feel.lua)
+
+## Optional Feedback Authoring
+
+`feel.feedbacks` lets gameplay call one named feedback while a feedback module owns the actual camera, post, sound, time, and g3d events:
+
+```lua
+local Feedbacks = require("lib.feel.feedbacks").new({ love = fx, g3d = g3dfx })
+
+Feedbacks.define("hit.heavy", {
+  { kind = "time.freeze", duration = 0.04 },
+  { kind = "screen.flash", amount = 0.3, duration = 0.08 },
+  { kind = "g3d.camera.shake", amount = 0.14, duration = 0.16 },
+})
+
+Feedbacks.play("hit.heavy", { x = enemy.x, y = enemy.y, z = enemy.z })
+```
 
 ## Optional g3d Helpers
 

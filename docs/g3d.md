@@ -119,5 +119,20 @@ Supported events:
 | `g3d.camera.lookAt` | `{ x, y, z, tx, ty, tz }` |
 | `g3d.camera.direction` | `{ x, y, z, direction, pitch }` |
 | `g3d.camera.resize` | `{ width, height }` |
+| `g3d.camera.shake` | `{ amount, duration, frequency? }` |
+| `g3d.camera.fov` | `{ amount, duration, returnDuration? }` |
+| `g3d.camera.height` | `{ amount, duration, returnDuration? }` |
+| `g3d.camera.yaw` | `{ amount, duration, returnDuration?, radians? }` |
+| `g3d.camera.targetOffset` | `{ x, y, z, duration, returnDuration? }` |
+| `g3d.camera.reset` | `{ duration? }` |
+| `g3d.model.scalePunch` | `{ name, amount, duration, returnDuration? }` |
+| `g3d.model.squash` | `{ name, amount, duration, returnDuration? }` |
+| `g3d.model.positionShake` | `{ name, amount, duration, frequency? }` |
+| `g3d.model.rotationShake` | `{ name, amount, duration, frequency? }` |
+| `g3d.model.reset` | `{ name, duration? }` |
 
 Unknown events are ignored by the helper and still forwarded to your `extra.emit` callback.
+
+Camera feedback is applied to g3d camera parameters. Do not use the 2D `feel.love` camera push/pop helpers for a 3D world; bind a g3d camera target and animate fields such as `shakeX`, `heightKick`, `fovKick`, `yawKick`, and `targetOffsetX/Y/Z`.
+
+For higher-level feedback manifests, see [Feedback Authoring](feedbacks.md).

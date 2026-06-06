@@ -11,6 +11,8 @@ love examples/3d
 Controls:
 
 - `Space` / left click: play model wobble, rock bounce, and camera punch sequences.
+- HUD `SLOW` button / `1`: toggle slow motion.
+- HUD `PAUSE` button / `2`: toggle paused gameplay time.
 - `L`: cycle the ship through look-at objectives: right rock, rear rock, left rock, then main pose.
 - `P`: play a post-processing focus pass with grade and vignette.
 - `C`: clear post-processing and screen overlays.

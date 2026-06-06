@@ -10,10 +10,12 @@ icon: lucide/wand-sparkles
 local feel = require("feel")
 local feelLove = require("feel.love")
 local feelG3d = require("feel.g3d")
+local feelFeedbacks = require("feel.feedbacks")
 
 local target = feel.target({ values = { scale = 1, teleportGlow = 0 } })
 local fx = feelLove.new()
 local g3dfx = feelG3d.new(g3d)
+local Feedbacks = feelFeedbacks.new({ love = fx, g3d = g3dfx })
 ```
 
 ## What Should Complete
@@ -22,7 +24,9 @@ local g3dfx = feelG3d.new(g3d)
 - `feelLove.new`.
 - Adapter methods on `fx`, including `sound`, `particle`, `shader`, `emit`, `setPost`, and `drawPost`.
 - Optional g3d helper methods on `g3dfx`, including `model`, `camera`, `update`, `emit`, and `handlers`.
+- Feedback authoring helpers on `Feedbacks`, including `define`, `play`, `clear`, `timeScale`, and `timeTarget`.
 - Common adapter event payloads such as `post.tween`, `screen.flash`, `camera.shake`, `particle.emit`, and `sound.volume`.
+- g3d feedback event names such as `g3d.camera.shake`, `g3d.camera.fov`, and `g3d.model.scalePunch`.
 - Post-processing values, including bloom `intensity`, `threshold`, `softness`, and `passes`.
 - Custom numeric target values such as `teleportGlow`, `glow`, or `charge`.
 
