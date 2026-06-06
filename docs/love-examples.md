@@ -26,7 +26,7 @@ Run the standalone g3d example:
 love examples/3d
 ```
 
-The g3d demo uses `feel.g3d` to bind animated target values to app-owned g3d models and camera state. It shows a model wobble, camera punch, and `g3d.model.lookAt` event without wrapping rendering or assets.
+The g3d demo uses `feel.g3d` to bind animated target values to app-owned g3d models and camera state. It also uses the LOVE adapter to post-process the rendered 3D scene with bloom, chromatic, lens, grade, and vignette effects while leaving the HUD unprocessed.
 
 ## Scenes
 

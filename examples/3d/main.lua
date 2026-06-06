@@ -1,9 +1,11 @@
 package.path = "?.lua;?/init.lua;../../?.lua;../../?/init.lua;vendor/?.lua;vendor/?/init.lua;" .. package.path
 
 local feel = require("feel")
+local feelLove = require("feel.love")
 local feelG3d = require("feel.g3d")
 local g3d = require("vendor.g3d")
 
+local fx
 local g3dfx
 local shipModel
 local floorModel
@@ -93,6 +95,126 @@ local function defineSequences()
 		{ kind = "animate", duration = 0.09, to = { z = 0.2, scale = 1.22 }, ease = "quadout" },
 		{ kind = "animate", duration = 0.26, to = { z = -0.15, scale = 1 }, ease = "bounceout" },
 	})
+
+	feel.define("post.impact", {
+		{
+			kind = "emit",
+			event = "post.set",
+			payload = {
+				effect = "bloom",
+				values = { intensity = 0.35, threshold = 0.28, softness = 0.34, passes = 3 },
+			},
+		},
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = { effect = "bloom", values = { intensity = 1.85 }, duration = 0.08, ease = "quadout", restart = true },
+		},
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = {
+				effect = "chromatic",
+				values = { force = 1, x = 0.01, y = -0.006 },
+				duration = 0.07,
+				ease = "quadout",
+				restart = true,
+			},
+		},
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = { effect = "lens", values = { distortion = 0.42 }, duration = 0.08, ease = "quadout", restart = true },
+		},
+		{ kind = "emit", event = "screen.flash", payload = { amount = 0.16, duration = 0.12, color = { 0.2, 0.8, 1, 1 } } },
+		{ kind = "wait", duration = 0.14 },
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = { effect = "bloom", values = { intensity = 0.22 }, duration = 0.36, ease = "quadout", restart = true },
+		},
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = {
+				effect = "chromatic",
+				values = { force = 0, x = 0, y = 0 },
+				duration = 0.22,
+				ease = "quadout",
+				restart = true,
+			},
+		},
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = { effect = "lens", values = { distortion = 0 }, duration = 0.22, ease = "quadout", restart = true },
+		},
+	})
+
+	feel.define("post.focus", {
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = {
+				effect = "vignette",
+				values = { intensity = 0.72, radius = 0.68, softness = 0.22 },
+				duration = 0.22,
+				ease = "quadout",
+				restart = true,
+			},
+		},
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = {
+				effect = "grade",
+				values = { exposure = 1.06, saturation = 1.32, hueShift = 0.06, contrast = 0.58 },
+				duration = 0.24,
+				ease = "quadout",
+				restart = true,
+			},
+		},
+		{ kind = "wait", duration = 1.2 },
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = {
+				effect = "vignette",
+				values = { intensity = 0.18, radius = 0.8, softness = 0.42 },
+				duration = 0.45,
+				ease = "quadout",
+				restart = true,
+			},
+		},
+		{
+			kind = "emit",
+			event = "post.tween",
+			payload = {
+				effect = "grade",
+				values = { exposure = 1, saturation = 1, hueShift = 0, contrast = 0.4 },
+				duration = 0.45,
+				ease = "quadout",
+				restart = true,
+			},
+		},
+	})
+
+	feel.define("post.clear", {
+		{ kind = "emit", event = "post.clear", payload = {} },
+		{ kind = "emit", event = "screen.clear", payload = {} },
+	})
+end
+
+local function postHandlers(key)
+	return fx:handlers({
+		restart = true,
+		key = key,
+		emit = function(event)
+			if event.kind ~= "screen.flash" then
+				log("post: " .. event.kind)
+			end
+		end,
+	})
 end
 
 local function playImpact()
@@ -101,6 +223,7 @@ local function playImpact()
 	feel.play("rock.bounce", leftRock, { restart = true, key = "left.bounce" })
 	feel.play("rock.bounce", rightRock, { restart = true, key = "right.bounce" })
 	feel.play("rock.bounce", rearRock, { restart = true, key = "rear.bounce" })
+	feel.play("post.impact", nil, postHandlers("post.impact"))
 	log("feel.play: model wobble + camera punch")
 end
 
@@ -142,6 +265,11 @@ local function faceNextTarget()
 	}))
 end
 
+local function playFocusPost()
+	feel.play("post.focus", nil, postHandlers("post.focus"))
+	log("post: focus grade + vignette")
+end
+
 local function resetDemo()
 	feel.clear(ship)
 	feel.clear(camera)
@@ -175,6 +303,7 @@ local function resetDemo()
 	currentLookTarget = nil
 
 	g3dfx:update()
+	feel.play("post.clear", nil, postHandlers("post.clear"))
 	log("reset targets")
 end
 
@@ -182,6 +311,7 @@ function love.load()
 	love.window.setTitle("feel.lua + g3d")
 	love.graphics.setBackgroundColor(colors.bg)
 
+	fx = feelLove.new()
 	g3dfx = feelG3d.new(g3d)
 	local texture = whiteTexture()
 	local cube = cubeVertices(1)
@@ -233,6 +363,7 @@ function love.update(dt)
 	feel.update(dt)
 	g3dfx:update()
 	applyLookTarget()
+	fx:update(dt)
 end
 
 local function drawScene()
@@ -268,7 +399,7 @@ local function drawOverlay()
 	love.graphics.print("feel.lua + groverburger/g3d", 44, 42)
 	setColor(colors.muted)
 	love.graphics.print(
-		"SPACE/click plays target animations. L cycles g3d.model.lookAt objectives. g3dfx:update() applies values.",
+		"SPACE/click hits. L cycles look-at. P plays grade/vignette. C clears post. HUD stays outside drawPost.",
 		44,
 		68
 	)
@@ -283,8 +414,11 @@ local function drawOverlay()
 end
 
 function love.draw()
-	love.graphics.clear(colors.bg)
-	drawScene()
+	fx:drawPost(function()
+		love.graphics.clear(colors.bg)
+		drawScene()
+	end)
+	fx:drawOverlay()
 	drawOverlay()
 end
 
@@ -299,6 +433,11 @@ function love.keypressed(key)
 		playImpact()
 	elseif key == "l" then
 		faceNextTarget()
+	elseif key == "p" then
+		playFocusPost()
+	elseif key == "c" then
+		feel.play("post.clear", nil, postHandlers("post.clear"))
+		log("post: clear")
 	elseif key == "r" then
 		resetDemo()
 	elseif key == "escape" then
