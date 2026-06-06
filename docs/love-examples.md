@@ -20,6 +20,14 @@ love examples/asteroidz
 
 Asteroidz is a small arcade game that uses `feel` sequences for thrust, shooting, asteroid hits, ship explosions, teleport bloom, HUD pulses, camera shake, screen flash, post-processing, and procedural audio cues. See the [Asteroidz Walkthrough](asteroidz.md) for how those pieces fit together.
 
+Run the standalone g3d example:
+
+```sh
+love examples/3d
+```
+
+The g3d demo uses `feel.g3d` to bind animated target values to app-owned g3d models and camera state. It shows a model wobble, camera punch, and `g3d.model.lookAt` event without wrapping rendering or assets.
+
 ## Scenes
 
 - `scenes/feedback_stack.lua`: a full recipe stack with animation, audio, emit events, callbacks, particles, beams, shake, and flash.

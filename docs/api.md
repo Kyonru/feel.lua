@@ -179,7 +179,7 @@ Channels are intentionally small and local. They are for feedback routing, not g
 | Export | Purpose |
 | --- | --- |
 | `feel.fields` | Default transform fields. |
-| `feel.flux` | Vendored Flux module. |
+| `feel.flux` | Vendored Flux module. Add custom easing functions through `feel.flux.easing`. |
 | `feel.normalizeStep` | Step normalization helper. |
 | `feel.normalizeSequence` | Sequence normalization helper. |
 

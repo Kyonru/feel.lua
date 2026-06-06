@@ -31,6 +31,25 @@ Each step is a table with a `kind`. Steps run in order unless a control-flow ste
 
 Use `from` to set starting values before a tween, `delay` to delay a tween, and `onStart`, `onUpdate`, or `onComplete` hooks for step-local callbacks.
 
+Supported string eases are `linear`, plus `in`, `out`, and `inout` variants for `quad`, `cubic`, `quart`, `quint`, `expo`, `sine`, `circ`, `back`, `elastic`, and `bounce`. For example: `quadout`, `backout`, `bounceout`, or `bounceinout`.
+
+Custom easing functions can be registered on the exposed Flux easing table. An easing receives progress `p` from `0` to `1` and should return the adjusted progress.
+
+```lua
+local feel = require("feel")
+
+feel.flux.easing.pop = function(p)
+  return math.sin(p * math.pi * 0.5) ^ 0.7
+end
+
+feel.define("button.pop", {
+  { kind = "animate", duration = 0.18, to = { scale = 1.24 }, ease = "pop" },
+  { kind = "animate", duration = 0.16, to = { scale = 1 }, ease = "backout" },
+})
+```
+
+Keep custom easing functions deterministic and numeric. Flux will raise an error if a sequence references an easing name that is not registered.
+
 `wait` and `pause` delay the next step until enough `feel.update(dt)` time has passed.
 
 ```lua
