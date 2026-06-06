@@ -47,6 +47,36 @@ for k, v in pairs(easing) do
   ]], v)
 end
 
+flux.easing.bounceout = function(p)
+  local n1 = 7.5625
+  local d1 = 2.75
+
+  if p < 1 / d1 then
+    return n1 * p * p
+  elseif p < 2 / d1 then
+    p = p - 1.5 / d1
+    return n1 * p * p + 0.75
+  elseif p < 2.5 / d1 then
+    p = p - 2.25 / d1
+    return n1 * p * p + 0.9375
+  end
+
+  p = p - 2.625 / d1
+  return n1 * p * p + 0.984375
+end
+
+flux.easing.bouncein = function(p)
+  return 1 - flux.easing.bounceout(1 - p)
+end
+
+flux.easing.bounceinout = function(p)
+  if p < 0.5 then
+    return (1 - flux.easing.bounceout(1 - 2 * p)) * 0.5
+  end
+
+  return (1 + flux.easing.bounceout(2 * p - 1)) * 0.5
+end
+
 
 
 local tween = {}

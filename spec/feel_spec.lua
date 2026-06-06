@@ -101,6 +101,21 @@ describe("feel.lua", function()
     assert.is_true(dirty > 0)
   end)
 
+  it("supports bounce easing through flux", function()
+    local target = feel.target()
+
+    assert.is_not_nil(feel.flux.easing.bouncein)
+    assert.is_not_nil(feel.flux.easing.bounceout)
+    assert.is_not_nil(feel.flux.easing.bounceinout)
+
+    feel.play({
+      { kind = "animate", to = { y = 10 }, duration = 0.1, ease = "bounceout" },
+    }, target)
+    feel.update(0.1)
+
+    assert.are.equal(10, target.values.y)
+  end)
+
   it("passes emit, audio, and callback context", function()
     local target = feel.target({ label = "Launch" })
     local calls = {}

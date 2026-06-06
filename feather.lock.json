@@ -15,7 +15,7 @@
         {
           "name": "flux.lua",
           "target": "feel/vendor/flux.lua",
-          "sha256": "11542ab78001f99d94d0b9ca3f99072494e1e4f4ce395db203bf4f7e6f7889d5"
+          "sha256": "a8595b034f83aff86591d9d343abf0f7c0873ee4bb6036dfc5008503153e22fa"
         }
       ],
       "installDir": "feel/vendor",
