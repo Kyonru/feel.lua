@@ -12,6 +12,8 @@ local feelLove = require("feel.love")
 local fx = feelLove.new()
 ```
 
+For groverburger/g3d model and camera transforms, use the separate [g3d Helpers](g3d.md) module.
+
 ## Handlers
 
 Pass `fx:handlers(extra)` to `feel.play`. The adapter handles registered audio cues and known adapter events first, then calls your `extra.audio` or `extra.emit` callback.

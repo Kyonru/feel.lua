@@ -106,6 +106,32 @@ end
 
 - [Guides](https://kyonru.github.io/feel.lua)
 
+## Optional g3d Helpers
+
+`feel.g3d` can bind animated target values to app-owned [g3d](https://github.com/groverburger/g3d) models and cameras:
+
+```lua
+local feel = require("lib.feel")
+local feelG3d = require("lib.feel.g3d")
+local g3d = require("g3d")
+
+local g3dfx = feelG3d.new(g3d)
+local shipModel = g3d.newModel("ship.obj", "ship.png")
+local ship = g3dfx:model("ship", shipModel, {
+  values = { x = 0, y = 0, z = 0, rz = 0, scale = 1 },
+})
+
+feel.define("ship.hit", {
+  { kind = "animate", to = { scale = 1.2, rz = 0.15 }, duration = 0.06 },
+  { kind = "animate", to = { scale = 1, rz = 0 }, duration = 0.22, ease = "backout" },
+})
+
+function love.update(dt)
+  feel.update(dt)
+  g3dfx:update()
+end
+```
+
 ## How does it work?
 
 It wraps a vendored copy of [flux](https://github.com/rxi/flux) by [rxi](https://github.com/rxi) so you can describe game feel as small Lua recipes: animation, timing, emitted effects, audio cues, callbacks, random choices, loops, and grouped steps.
