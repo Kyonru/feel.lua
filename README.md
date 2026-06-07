@@ -106,6 +106,7 @@ end
 ## Docs
 
 - [Guides](https://kyonru.github.io/feel.lua)
+- [Changelog](CHANGELOG.md)
 
 ## Optional Feedback Authoring
 
