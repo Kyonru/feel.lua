@@ -1,4 +1,4 @@
-.PHONY: help docs test example love2d asteroidz g3d
+.PHONY: help docs test example love2d asteroidz g3d menori
 
 help:
 	@echo "Targets:"
@@ -8,6 +8,7 @@ help:
 	@echo "  love2d   Alias for example"
 	@echo "  asteroidz Run the Asteroidz LOVE2D example"
 	@echo "  g3d      Run the g3d LOVE2D example"
+	@echo "  menori   Run the Menori LOVE2D example"
 
 docs:
 	zensical serve
@@ -25,3 +26,6 @@ asteroidz:
 
 g3d:
 	love examples/3d
+
+menori:
+	love examples/menori

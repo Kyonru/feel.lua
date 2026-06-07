@@ -4,7 +4,7 @@ icon: lucide/sparkles
 
 # Feedback Authoring
 
-`feel.feedbacks` is an optional authoring layer for named feedback stacks. It sits on top of `feel.play`, `feel.channel`, `feel.love`, and `feel.g3d`; it does not replace them.
+`feel.feedbacks` is an optional authoring layer for named feedback stacks. It sits on top of `feel.play`, `feel.channel`, `feel.love`, `feel.g3d`, and `feel.menori`; it does not replace them.
 
 Use it when gameplay should announce a feedback by name while one module owns the camera, post-processing, particles, audio, time, and model juice.
 
@@ -69,9 +69,10 @@ Core sequence steps still work unchanged. Adapter-style steps are shorthand for 
 { kind = "post.tween", effect = "bloom", values = { intensity = 1.2 }, duration = 0.1 }
 { kind = "particle.emit", name = "sparks", x = "$x", y = "$y", count = 18 }
 { kind = "g3d.camera.height", amount = 0.2, duration = 0.06, returnDuration = 0.2 }
+{ kind = "menori.node.scalePunch", name = "enemy", amount = 0.18, duration = 0.06 }
 ```
 
-Events are routed to the configured LOVE adapter, then the g3d adapter, then your optional `emit` callback.
+Events are routed to the configured LOVE adapter, then the g3d adapter, then the Menori adapter, then your optional `emit` callback.
 
 ## Context Values
 

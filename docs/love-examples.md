@@ -28,6 +28,14 @@ love examples/3d
 
 The g3d demo uses `feel.g3d` to bind animated target values to app-owned g3d models and camera state. It also uses the LOVE adapter to post-process the rendered 3D scene with bloom, chromatic, lens, grade, and vignette effects while leaving the HUD unprocessed.
 
+Run the standalone Menori example:
+
+```sh
+love examples/menori
+```
+
+The Menori demo uses `feel.menori` to bind animated target values to Menori nodes, a perspective camera, a small animation-controller-like object, and material uniforms. It also routes Menori feedback stacks through `feel.feedbacks` alongside LOVE screen and post-processing effects.
+
 ## Scenes
 
 - `scenes/feedback_stack.lua`: a full recipe stack with animation, audio, emit events, callbacks, particles, beams, shake, and flash.

@@ -383,6 +383,9 @@ local function routeEmit(instance, event, playCtx, userEmit)
   if instance._g3d and type(instance._g3d.emit) == "function" then
     instance._g3d:emit(event, playCtx)
   end
+  if instance._menori and type(instance._menori.emit) == "function" then
+    instance._menori:emit(event, playCtx)
+  end
   if type(instance._emit) == "function" then
     instance._emit(event, playCtx)
   end
@@ -447,6 +450,7 @@ function FeelFeedbacks.new(opts)
     _registry = {},
     _love = opts.love,
     _g3d = opts.g3d,
+    _menori = opts.menori,
     _emit = opts.emit,
     _audio = opts.audio,
     _log = opts.log,

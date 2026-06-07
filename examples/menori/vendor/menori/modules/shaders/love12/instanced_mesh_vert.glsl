@@ -1,0 +1,29 @@
+varying vec3 normal;
+varying vec4 frag_position;
+
+#menori_include <transpose.glsl>
+#menori_include <inverse.glsl>
+#menori_include <billboard_base.glsl>
+
+uniform mat4 m_view;
+uniform mat4 m_projection;
+uniform mat4 m_model;
+
+vec4 position(mat4 transform_projection, vec4 vertex_position) {
+	vec3 vert_normal = VertexNormal;
+	vec4 vert_position = vec4(VertexPosition.xyz, 1.0);
+	
+	#menori_include <morph.glsl>
+
+	vert_position = m_model * vert_position;
+
+	#menori_include <color.glsl>
+	#menori_include <billboard.glsl>
+	#menori_include <normal.glsl>
+
+	vert_position += vec4(InstancePosition.xyz, 0.0);
+
+	normal = vert_normal;
+	frag_position = m_view * m_model * vert_position;
+	return m_projection * frag_position;
+}

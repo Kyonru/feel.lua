@@ -59,6 +59,7 @@ nav = [
     { "Adapter Guide" = "love-adapter.md" },
     { "Post Processing" = "post-processing.md" },
     { "g3d Helpers" = "g3d.md" },
+    { "Menori Helpers" = "menori.md" },
   ] },
   { "Examples" = [
     { "LOVE Examples" = "love-examples.md" },

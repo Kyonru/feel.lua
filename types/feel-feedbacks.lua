@@ -7,6 +7,7 @@ local feelFeedbacks = {}
 ---@class FeelFeedbacksOptions
 ---@field love? FeelLoveAdapter
 ---@field g3d? FeelG3dAdapter
+---@field menori? FeelMenoriAdapter
 ---@field emit? fun(event: FeelEvent, ctx: FeelContext)
 ---@field audio? fun(event: FeelAudioEvent, ctx: FeelContext)
 ---@field log? fun(message: string, ctx: FeelContext)
@@ -59,6 +60,27 @@ local feelFeedbacks = {}
 ---| '"g3d.model.positionShake"'
 ---| '"g3d.model.rotationShake"'
 ---| '"g3d.model.reset"'
+---| '"menori.camera.shake"'
+---| '"menori.camera.fov"'
+---| '"menori.camera.height"'
+---| '"menori.camera.yaw"'
+---| '"menori.camera.distance"'
+---| '"menori.camera.targetOffset"'
+---| '"menori.camera.reset"'
+---| '"menori.node.scalePunch"'
+---| '"menori.node.squash"'
+---| '"menori.node.positionShake"'
+---| '"menori.node.rotationShake"'
+---| '"menori.node.reset"'
+---| '"menori.animation.action"'
+---| '"menori.animation.play"'
+---| '"menori.animation.pause"'
+---| '"menori.animation.stop"'
+---| '"menori.animation.seek"'
+---| '"menori.animation.speed"'
+---| '"menori.uniform.set"'
+---| '"menori.uniform.pulse"'
+---| '"menori.uniform.reset"'
 
 ---@param opts? FeelFeedbacksOptions
 ---@return FeelFeedbacks

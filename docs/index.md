@@ -25,5 +25,6 @@ icon: lucide/scan-heart
 | [LOVE Adapter](love-adapter.md) | Registered sound cues, haptics, particle systems, shaders, post-processing, camera events, screen overlays, and adapter handlers. |
 | [Post Processing](post-processing.md) | Built-in LOVE canvas effects, parameters, and recipes. |
 | [g3d Helpers](g3d.md) | Optional helpers for binding `feel.target` values to groverburger/g3d models and cameras. |
+| [Menori Helpers](menori.md) | Optional helpers for binding `feel.target` values to Menori nodes, cameras, animations, and uniforms. |
 | [LOVE Examples](love-examples.md) | Showcase scenes and feature-specific examples. |
 | [Asteroidz Walkthrough](asteroidz.md) | A small game showing sequences, post-processing, UI juice, and adapter events together. |

@@ -110,7 +110,7 @@ end
 
 ## Optional Feedback Authoring
 
-`feel.feedbacks` lets gameplay call one named feedback while a feedback module owns the actual camera, post, sound, time, and g3d events:
+`feel.feedbacks` lets gameplay call one named feedback while a feedback module owns the actual camera, post, sound, time, and 3D adapter events:
 
 ```lua
 local Feedbacks = require("lib.feel.feedbacks").new({ love = fx, g3d = g3dfx })
@@ -147,6 +147,33 @@ feel.define("ship.hit", {
 function love.update(dt)
   feel.update(dt)
   g3dfx:update()
+end
+```
+
+## Optional Menori Helpers
+
+`feel.menori` can bind animated target values to app-owned [Menori](https://github.com/rozenmad/Menori) nodes, cameras, glTF animations, and uniforms:
+
+```lua
+local feel = require("lib.feel")
+local feelMenori = require("lib.feel.menori")
+local menori = require("menori")
+
+local menorifx = feelMenori.new(menori, { environment = environment })
+local ship = menorifx:node("ship", shipNode, {
+  values = { x = 0, y = 0, z = 0, rz = 0, scale = 1 },
+})
+
+feel.define("ship.hit", {
+  { kind = "emit", event = "menori.node.scalePunch", payload = { name = "ship", amount = 0.2, duration = 0.06 } },
+  { kind = "emit", event = "menori.camera.shake", payload = { amount = 0.06, duration = 0.14 } },
+})
+
+feel.play("ship.hit", ship, menorifx:handlers())
+
+function love.update(dt)
+  feel.update(dt)
+  menorifx:update(dt)
 end
 ```
 

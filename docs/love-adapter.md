@@ -12,7 +12,7 @@ local feelLove = require("feel.love")
 local fx = feelLove.new()
 ```
 
-For groverburger/g3d model and camera transforms, use the separate [g3d Helpers](g3d.md) module.
+For 3D model and camera transforms, use the separate [g3d Helpers](g3d.md) or [Menori Helpers](menori.md) modules.
 
 ## Handlers
 
