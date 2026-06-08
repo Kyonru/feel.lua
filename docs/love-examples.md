@@ -4,6 +4,10 @@ icon: lucide/play
 
 # LOVE Examples
 
+<!-- feel:feature-gif love2d -->
+![Animated GIF showing Feel.lua driving a compact LOVE2D mini-scene.](assets/feature-gifs/love2d.gif)
+<!-- /feel:feature-gif love2d -->
+
 Run the showcase from the repository root:
 
 ```sh
@@ -35,6 +39,19 @@ love examples/menori
 ```
 
 The Menori demo uses `feel.menori` to bind animated target values to Menori nodes, a perspective camera, a small animation-controller-like object, and material uniforms. It also routes Menori feedback stacks through `feel.feedbacks` alongside LOVE screen and post-processing effects.
+
+## Generating Documentation GIFs
+
+Documentation GIFs are generated from deterministic LOVE capture scenes and committed with the docs:
+
+```sh
+make docs-gifs
+make docs-gifs FEATURE=shake
+KEEP_FRAMES=1 make docs-gifs FEATURE=shake
+LOVE_BIN=/path/to/love FFMPEG_BIN=/path/to/ffmpeg make docs-gifs
+```
+
+Readers and documentation deploy jobs do not need LOVE or FFmpeg; they use the committed files in `docs/assets/feature-gifs/`.
 
 ## Scenes
 

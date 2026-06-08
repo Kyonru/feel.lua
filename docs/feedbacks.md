@@ -4,6 +4,10 @@ icon: lucide/sparkles
 
 # Feedback Authoring
 
+<!-- feel:feature-gif feedbacks -->
+![Animated GIF showing one named feedback stack triggering camera, flash, post, and model cues.](assets/feature-gifs/feedbacks.gif)
+<!-- /feel:feature-gif feedbacks -->
+
 `feel.feedbacks` is an optional authoring layer for named feedback stacks. It sits on top of `feel.play`, `feel.channel`, `feel.love`, `feel.g3d`, and `feel.menori`; it does not replace them.
 
 Use it when gameplay should announce a feedback by name while one module owns the camera, post-processing, particles, audio, time, and model juice.

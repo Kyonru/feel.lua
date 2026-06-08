@@ -4,6 +4,10 @@ icon: lucide/cuboid
 
 # Menori Helpers
 
+<!-- feel:feature-gif menori -->
+![Animated GIF showing Feel.lua Menori helper-style node, camera, animation, and uniform feedback.](assets/feature-gifs/menori.gif)
+<!-- /feel:feature-gif menori -->
+
 `feel.menori` is an optional helper for [rozenmad/Menori](https://github.com/rozenmad/Menori). It binds `feel.target` values to app-owned Menori nodes, perspective cameras, glTF animation controllers, and `UniformList` objects. It does not load assets, own scenes, render nodes, or replace Menori controls.
 
 For a runnable LOVE project, see `examples/menori`.

@@ -1,8 +1,9 @@
-.PHONY: help docs test example love2d asteroidz g3d menori
+.PHONY: help docs docs-gifs test example love2d asteroidz g3d menori
 
 help:
 	@echo "Targets:"
 	@echo "  docs     Serve documentation with Zensical"
+	@echo "  docs-gifs Generate documentation feature GIFs"
 	@echo "  test     Run Busted specs"
 	@echo "  example  Run the LOVE2D example"
 	@echo "  love2d   Alias for example"
@@ -12,6 +13,9 @@ help:
 
 docs:
 	zensical serve
+
+docs-gifs:
+	lua scripts/generate_doc_gifs.lua
 
 test:
 	busted spec

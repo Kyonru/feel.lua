@@ -4,6 +4,10 @@ icon: lucide/list-tree
 
 # Sequence Steps
 
+<!-- feel:feature-gif sequence -->
+![Animated GIF showing Feel.lua steps running one after another.](assets/feature-gifs/sequence.gif)
+<!-- /feel:feature-gif sequence -->
+
 Each step is a table with a `kind`. Steps run in order unless a control-flow step changes how child steps are played.
 
 ## Step Reference

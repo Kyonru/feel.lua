@@ -4,6 +4,10 @@ icon: lucide/rocket
 
 # Getting Started
 
+<!-- feel:feature-gif getting-started -->
+![Animated GIF showing a Feel.lua button press sequence with glow and sparks.](assets/feature-gifs/getting-started.gif)
+<!-- /feel:feature-gif getting-started -->
+
 Define feedback as small Lua tables, then play those recipes from normal game code. This page builds a complete minimal LOVE example with one animated target and one host-owned side effect.
 
 ## Minimal LOVE Loop

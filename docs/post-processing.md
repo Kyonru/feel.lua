@@ -4,6 +4,10 @@ icon: lucide/sparkles
 
 # Post Processing
 
+<!-- feel:feature-gif post-processing -->
+![Animated GIF showing bloom and chromatic post-processing feedback on a scene.](assets/feature-gifs/post-processing.gif)
+<!-- /feel:feature-gif post-processing -->
+
 `feel.love` includes a canvas-backed 2D post-processing pipeline. Wrap the scene you want processed with `fx:drawPost(drawScene)`.
 
 ```lua
