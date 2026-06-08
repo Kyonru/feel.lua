@@ -36,7 +36,7 @@ icon: lucide/scan-heart
 | --- | --- |
 | Getting Started | ![Animated GIF showing a Feel.lua button press sequence with glow and sparks.](assets/feature-gifs/getting-started.gif) |
 | Animate | ![Animated GIF showing Feel.lua animate steps moving and scaling a card.](assets/feature-gifs/animate.gif) |
-| Easing | ![Animated GIF comparing linear, backout, and bounceout easing motion.](assets/feature-gifs/easing.gif) |
+| Easing | ![Animated GIF comparing linear, quadout, sineinout, backout, elasticout, and bounceout easing motion.](assets/feature-gifs/easing.gif) |
 | Sequence | ![Animated GIF showing Feel.lua steps running one after another.](assets/feature-gifs/sequence.gif) |
 | Parallel | ![Animated GIF showing parallel Feel.lua branches animating together.](assets/feature-gifs/parallel.gif) |
 | Repeat | ![Animated GIF showing a repeated Feel.lua step ticking three times.](assets/feature-gifs/repeat.gif) |
