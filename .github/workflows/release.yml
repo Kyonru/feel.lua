@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  package-library:
+    name: Package feel.lua Library
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build library archive
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          safe_tag="$(printf '%s' "$GITHUB_REF_NAME" | tr '/[:space:]' '-' | tr -cd 'A-Za-z0-9._-')"
+          if [[ -z "$safe_tag" ]]; then
+            safe_tag="${GITHUB_SHA::12}"
+          fi
+          package_name="feel.lua-${safe_tag}"
+          staging_dir="dist/${package_name}"
+          archive_path="dist/${package_name}.zip"
+
+          mkdir -p "$staging_dir"
+          cp feel.lua "$staging_dir/feel.lua"
+          cp -R feel "$staging_dir/feel"
+
+          if [[ -d types ]]; then
+            cp -R types "$staging_dir/types"
+          fi
+
+          for file in README.md CHANGELOG.md LICENSE LICENSE.md COPYING COPYING.md .luarc.json; do
+            if [[ -f "$file" ]]; then
+              cp "$file" "$staging_dir/"
+            fi
+          done
+
+          test -f "$staging_dir/feel.lua"
+          test -f "$staging_dir/feel/init.lua"
+          test -f "$staging_dir/feel/love.lua"
+          test -f "$staging_dir/feel/feedbacks.lua"
+
+          (cd dist && zip -r -q "${package_name}.zip" "$package_name")
+          unzip -l "$archive_path"
+
+          echo "archive_path=${archive_path}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload archive to GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: ${{ steps.package.outputs.archive_path }}
+          fail_on_unmatched_files: true
+          overwrite_files: true
+          generate_release_notes: true
