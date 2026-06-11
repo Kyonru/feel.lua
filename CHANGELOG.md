@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.0 - 2026-06-11
+
+- Added the optional Menori adapter for binding `feel.target` values to Menori nodes, cameras, animation controls, material uniforms, and feedback handlers.
+- Added generated documentation GIFs for the feature gallery and representative guide pages, including refreshed polished GIF assets.
+- Added project funding metadata and removed hardcoded funding configuration from the docs/site setup.
+- Added the project `LICENSE`.
+- Added a GitHub release workflow that packages the `feel.lua` library archive for tagged releases.
+
 ## v1.0.0 - 2026-06-07
 
 Initial stable release of `feel.lua`.
