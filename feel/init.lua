@@ -276,6 +276,11 @@ local function applyFields(target, source)
       target[key] = source[key]
     end
   end
+  for key, value in pairs(source or {}) do
+    if type(value) == "number" then
+      target[key] = value
+    end
+  end
 end
 
 local function isIdentity(values)

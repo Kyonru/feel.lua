@@ -402,6 +402,24 @@ describe("feel.lua", function()
     assert.are.same({ "new" }, events)
   end)
 
+  it("applies custom numeric fields from animate `from` on restart", function()
+    local target = feel.target({ values = { glow = 0 } })
+
+    local sequence = {
+      { kind = "animate", from = { glow = 1 }, to = { glow = 0 }, duration = 0.2 },
+    }
+
+    feel.play(sequence, target, { restart = true, key = "flash" })
+    assert.are.equal(1, target.values.glow)
+    feel.update(0.2)
+    assert.are.equal(0, target.values.glow)
+
+    feel.play(sequence, target, { restart = true, key = "flash" })
+    assert.are.equal(1, target.values.glow)
+    feel.update(0.1)
+    assert.is_true(target.values.glow > 0 and target.values.glow < 1)
+  end)
+
   it("reports active runner snapshots", function()
     local target = feel.target()
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.2.1 - 2026-06-12
+
+- `animate` steps now apply custom numeric value fields from `from`, matching the
+  `copyNumericFields` policy already used by targets and the `to` table. Restarted
+  sequences snap custom fields (e.g. hit-flash values) back to their `from` value.
+
 ## v1.2.0 - 2026-06-11
 
 - Added the optional Menori adapter for binding `feel.target` values to Menori nodes, cameras, animation controls, material uniforms, and feedback handlers.
