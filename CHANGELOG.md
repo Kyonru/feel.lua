@@ -1,19 +1,5 @@
 # Changelog
 
-## Unreleased
-
-All changes are additive and backward compatible.
-
-- New `spring` step kind: drive `target.values` with a damped harmonic oscillator
-  instead of a fixed-duration tween. `to` moves the rest anchor (transitions);
-  `pull` applies an instantaneous impulse that springs back to the anchor
-  (impact punches). Tunable via `stiffness`/`k`, `damping`/`d`, `settle`/`epsilon`,
-  and an optional `duration` cap; supports `from`/`onStart`/`onUpdate`/`onComplete`
-  like `animate`, and pauses/resumes/clears with its run.
-- New `feel.spring(x, stiffness, damping)` primitive: a raw spring you drive
-  yourself with `spring:update(dt)`, `spring:pull(force)`, `spring:animate(target)`,
-  and `spring:settled(epsilon)` — for spring motion outside a sequence.
-
 ## v1.3.0 - 2026-06-14
 
 All changes are additive and backward compatible.
@@ -33,6 +19,15 @@ All changes are additive and backward compatible.
 - New docs: Core Example (no-LOVE), Writing a Custom Adapter, Best Practices, and
   Troubleshooting; channel usage surfaced in Getting Started and the Core Runner guide.
 - New `examples/core` plain-Lua example (`make core`).
+- New `spring` step kind: drive `target.values` with a damped harmonic oscillator
+  instead of a fixed-duration tween. `to` moves the rest anchor (transitions);
+  `pull` applies an instantaneous impulse that springs back to the anchor
+  (impact punches). Tunable via `stiffness`/`k`, `damping`/`d`, `settle`/`epsilon`,
+  and an optional `duration` cap; supports `from`/`onStart`/`onUpdate`/`onComplete`
+  like `animate`, and pauses/resumes/clears with its run.
+- New `feel.spring(x, stiffness, damping)` primitive: a raw spring you drive
+  yourself with `spring:update(dt)`, `spring:pull(force)`, `spring:animate(target)`,
+  and `spring:settled(epsilon)` — for spring motion outside a sequence.
 
 ## v1.2.1 - 2026-06-12
 
