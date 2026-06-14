@@ -23,7 +23,7 @@ test:
 	busted spec
 
 lint:
-	luacheck .
+	luacheck feel.lua feel spec scripts
 
 example:
 	love examples/love2d

@@ -24,6 +24,7 @@ exclude_files = {
   ".venv/",
   "path/",              -- stray local virtualenv
   ".cache/",
+  ".luarocks/",
   "site/",
 }
 
