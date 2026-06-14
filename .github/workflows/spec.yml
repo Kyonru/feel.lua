@@ -17,20 +17,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        luaVersion:
-          - "5.1"
-          - "5.2"
-          - "5.3"
-          - "5.4"
-          - "luajit-2.1"
+        include:
+          - luaVersion: "5.1"
+            runSpecs: true
+          - luaVersion: "5.2"
+            runSpecs: true
+          - luaVersion: "5.3"
+            runSpecs: true
+          - luaVersion: "5.4"
+            runSpecs: true
+          - luaVersion: "luajit-2.1"
+            runSpecs: false
     steps:
       - uses: actions/checkout@v6
       - uses: leafo/gh-actions-lua@v11
         with:
           luaVersion: ${{ matrix.luaVersion }}
       - uses: leafo/gh-actions-luarocks@v5
-      - run: luarocks install busted --server=https://luarocks.org --check-lua-versions
-      - run: busted spec
+        if: ${{ matrix.runSpecs }}
+      - name: Install busted
+        if: ${{ matrix.runSpecs }}
+        run: luarocks install busted --server=https://luarocks.org --check-lua-versions
+      - name: Run busted specs
+        if: ${{ matrix.runSpecs }}
+        run: busted spec
+      - name: LuaJIT smoke test
+        if: ${{ !matrix.runSpecs }}
+        run: lua scripts/luajit_smoke.lua
 
   lint:
     name: Luacheck
