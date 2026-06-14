@@ -12,12 +12,34 @@ permissions:
 
 jobs:
   test:
+    name: Lua ${{ matrix.luaVersion }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        luaVersion:
+          - "5.1"
+          - "5.2"
+          - "5.3"
+          - "5.4"
+          - "luajit-2.1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: leafo/gh-actions-lua@v11
+        with:
+          luaVersion: ${{ matrix.luaVersion }}
+      - uses: leafo/gh-actions-luarocks@v5
+      - run: luarocks install busted
+      - run: busted spec
+
+  lint:
+    name: Luacheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
       - uses: leafo/gh-actions-lua@v11
         with:
-          luaVersion: "5.4"
+          luaVersion: "5.1"
       - uses: leafo/gh-actions-luarocks@v5
-      - run: luarocks install busted
-      - run: busted spec
+      - run: luarocks install luacheck
+      - run: luacheck .

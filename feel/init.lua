@@ -25,6 +25,15 @@ local validator = require(prefix .. ".validate")
 ---@field isPlaying fun(target?: FeelTarget, key?: string|number|table): boolean
 ---@field clear fun(target?: FeelTarget)
 ---@field channel fun(): FeelChannel
+---@field stop fun(ctx?: FeelContext)
+---@field pause fun(ctx?: FeelContext)
+---@field resume fun(ctx?: FeelContext)
+---@field pauseAll fun()
+---@field resumeAll fun()
+---@field isPausedAll fun(): boolean
+---@field setTimeScale fun(scale: number): number
+---@field timeScale fun(): number
+---@field strictAliases fun(on?: boolean): boolean
 ---@type FeelModule
 local Feel = {}
 
@@ -42,6 +51,13 @@ local Feel = {}
 ---@field source any
 ---@field opts FeelPlayOptions
 ---@field runner FeelRunner
+---@field stop fun(self: FeelContext)
+---@field pause fun(self: FeelContext)
+---@field resume fun(self: FeelContext)
+---@field isPaused fun(self: FeelContext): boolean
+---@field isPlaying fun(self: FeelContext): boolean
+---@field onComplete fun(self: FeelContext, fn: fun(ctx: FeelContext)): FeelContext
+---@field onStop fun(self: FeelContext, fn: fun(ctx: FeelContext)): FeelContext
 
 ---@class FeelPlayOptions
 ---@field trigger? string
@@ -80,6 +96,10 @@ local Feel = {}
 ---@field wait? FeelWaitState
 ---@field elapsed number
 ---@field cancelled? boolean
+---@field finished? boolean
+---@field paused? boolean
+---@field onComplete? (fun(ctx: FeelContext))[]
+---@field onStop? (fun(ctx: FeelContext))[]
 ---@field restartSlot? table
 ---@field restartKey? string|number|table
 
@@ -222,13 +242,26 @@ local Feel = {}
 ---@alias FeelSequenceInput string|FeelStepInput|FeelStepInput[]|nil|false
 
 local group = flux.group()
+-- Tweens belonging to paused runs are parked here. This group is never updated,
+-- so its tweens freeze (keeping progress) until the run resumes and they are
+-- moved back into `group`. See pauseRunner/resumeRunner.
+local pausedGroup = flux.group()
 local registry = {}
 local targets = setmetatable({}, { __mode = "k" })
 local runners = {}
 local restartTargets = setmetatable({}, { __mode = "k" })
 local nilRestartSlots = {}
+local globalPaused = false
+local globalTimeScale = 1
+local warnAliases = false
+local warnedAliasPairs = {}
 local Channel = {}
 Channel.__index = Channel
+-- Metatable applied to every FeelContext so runs can be controlled via methods
+-- (ctx:stop()/:pause()/:resume()/:onComplete(fn) …). Methods are populated near
+-- the public API, once the backing free functions exist.
+local FeelContext = {}
+FeelContext.__index = FeelContext
 
 local FIELDS = {
   "opacity",
@@ -427,6 +460,81 @@ local function removeChildRunner(parent, child)
   end
 end
 
+-- Fire a list of run-level callbacks (onComplete/onStop). The list is snapshotted
+-- first so a handler may safely register/unregister during dispatch.
+local function fireCallbacks(list, ctx)
+  if not list or #list == 0 then
+    return
+  end
+  local snapshot = {}
+  for index = 1, #list do
+    snapshot[index] = list[index]
+  end
+  for index = 1, #snapshot do
+    snapshot[index](ctx)
+  end
+end
+
+-- Emit a one-time deprecation notice for a redundant named field alias. Gated
+-- behind feel.strictAliases(true); silent (and deduped) otherwise.
+local function warnAlias(canonical, used)
+  if not warnAliases or used == canonical then
+    return
+  end
+  local key = canonical .. "<-" .. used
+  if warnedAliasPairs[key] then
+    return
+  end
+  warnedAliasPairs[key] = true
+  print(string.format("feel: step field '%s' is deprecated; prefer '%s'", used, canonical))
+end
+
+-- Canonical field resolvers. Each keeps every historical alias working while
+-- defining the precedence in exactly one place. Only redundant *named* aliases
+-- warn under strict mode; positional ([1]) and context-natural names do not.
+local function stepDuration(step, fallback)
+  if step.time ~= nil then
+    warnAlias("duration", "time")
+  end
+  return step.duration or step.time or fallback
+end
+
+local function stepCount(step)
+  if step.times ~= nil then
+    warnAlias("count", "times")
+  end
+  return step.count or step.times or 1
+end
+
+local function stepCallback(step)
+  if step.fn ~= nil then
+    warnAlias("callback", "fn")
+  end
+  return step.callback or step.fn or step[1]
+end
+
+local function parallelChildren(step)
+  return step.steps or step.sequences or step[1]
+end
+
+local function logMessage(step)
+  if step.text ~= nil then
+    warnAlias("message", "text")
+  end
+  return step.message or step.text or step[1] or ""
+end
+
+local function optionWeight(option)
+  if option.chance ~= nil then
+    warnAlias("weight", "chance")
+  end
+  return option.weight or option.chance or 1
+end
+
+local function optionSequence(option)
+  return option.step or option.sequence or option.steps or option[1]
+end
+
 local function childOptions(ctx, step)
   local result = {}
   local stepOpts = type(step.opts) == "table" and step.opts or nil
@@ -590,6 +698,51 @@ local function cancelRunner(runner)
   clearRestartSlot(runner)
   removeChildRunner(runner.parent, runner)
   removeRunner(runner)
+
+  fireCallbacks(runner.onStop, runner.ctx)
+end
+
+-- Gather every live tween in a runner's subtree (its own plus all descendants').
+local function collectRunnerTweens(runner, acc)
+  for _, active in ipairs(runner.tweens or {}) do
+    if active.tween then
+      acc[#acc + 1] = active.tween
+    end
+  end
+  for _, child in ipairs(runner.children or {}) do
+    collectRunnerTweens(child, acc)
+  end
+  return acc
+end
+
+-- Set the paused flag on a runner and its whole subtree so pausing a parent
+-- freezes its parallel/play/repeat children too.
+local function setSubtreePaused(runner, paused)
+  runner.paused = paused
+  for _, child in ipairs(runner.children or {}) do
+    setSubtreePaused(child, paused)
+  end
+end
+
+-- Move tweens between flux groups, but only those currently parented to `from`.
+local function moveTweens(tweens, from, to)
+  for _, tween in ipairs(tweens) do
+    if tween.parent == from then
+      flux.remove(from, tween)
+      flux.add(to, tween)
+    end
+  end
+end
+
+local function isAncestorPaused(runner)
+  local parent = runner.parent
+  while parent do
+    if parent.paused then
+      return true
+    end
+    parent = parent.parent
+  end
+  return false
 end
 
 local function childTarget(ctx, step)
@@ -614,7 +767,7 @@ local function selectedRandomOption(options)
 
   local total = 0
   for _, option in ipairs(options) do
-    local weight = option.weight or option.chance or 1
+    local weight = optionWeight(option)
     if weight > 0 then
       total = total + weight
     end
@@ -626,7 +779,7 @@ local function selectedRandomOption(options)
 
   local pick = math.random() * total
   for _, option in ipairs(options) do
-    local weight = option.weight or option.chance or 1
+    local weight = optionWeight(option)
     if weight > 0 then
       pick = pick - weight
       if pick <= 0 then
@@ -644,6 +797,7 @@ local function finishRunner(runner)
   end
 
   runner.cancelled = true
+  runner.finished = true
   clearRestartSlot(runner)
   removeChildRunner(runner.parent, runner)
   removeRunner(runner)
@@ -651,6 +805,8 @@ local function finishRunner(runner)
   if runner.done then
     runner.done(runner.ctx)
   end
+
+  fireCallbacks(runner.onComplete, runner.ctx)
 end
 
 local function runStep(runner, step, nextStep)
@@ -660,7 +816,7 @@ local function runStep(runner, step, nextStep)
 
   if kind == "wait" or kind == "pause" then
     runner.wait = {
-      remaining = step.duration or step.time or 0,
+      remaining = stepDuration(step, 0),
       nextStep = nextStep,
     }
     if runner.wait.remaining <= 0 then
@@ -678,7 +834,7 @@ local function runStep(runner, step, nextStep)
 
     state.active = (state.active or 0) + 1
     local tween
-    tween = group:to(state.values, step.duration or 0.16, copyNumericFields(step.to))
+    tween = group:to(state.values, stepDuration(step, 0.16), copyNumericFields(step.to))
     if step.ease then
       tween:ease(step.ease)
     end
@@ -743,7 +899,7 @@ local function runStep(runner, step, nextStep)
   end
 
   if kind == "parallel" then
-    local children = step.steps or step.sequences or step[1]
+    local children = parallelChildren(step)
     if type(children) ~= "table" or #children == 0 then
       nextStep()
       return
@@ -772,7 +928,7 @@ local function runStep(runner, step, nextStep)
 
   if kind == "repeat" then
     local sequence = childSequence(step)
-    local count = step.count or step.times or 1
+    local count = stepCount(step)
     if sequence == nil or sequence == false or (not step.forever and count <= 0) then
       nextStep()
       return
@@ -803,7 +959,7 @@ local function runStep(runner, step, nextStep)
 
   if kind == "random" then
     local option = selectedRandomOption(step.options or step[1])
-    local sequence = option and (option.step or option.sequence or option.steps or option[1])
+    local sequence = option and optionSequence(option)
     if sequence == nil or sequence == false then
       nextStep()
       return
@@ -841,12 +997,12 @@ local function runStep(runner, step, nextStep)
     end
     emit(opts, "emit", event, ctx)
   elseif kind == "callback" then
-    local callback = step.callback or step.fn or step[1]
+    local callback = stepCallback(step)
     if type(callback) == "function" then
       callback(ctx)
     end
   elseif kind == "log" then
-    local message = step.message or step.text or step[1] or ""
+    local message = logMessage(step)
     if type(opts.log) == "function" then
       opts.log(message, ctx)
     else
@@ -896,10 +1052,13 @@ runSequence = function(nameOrSequence, target, opts, done, meta)
     children = {},
     tweens = {},
     elapsed = 0,
+    onComplete = {},
+    onStop = {},
     restartSlot = restartSlot,
     restartKey = restartKey,
   }
   ctx.runner = runner
+  setmetatable(ctx, FeelContext)
 
   if meta.parent then
     runner.parent = meta.parent
@@ -986,20 +1145,25 @@ end
 ---@return boolean
 function Feel.update(dt)
   dt = dt or 0
+  if globalPaused then
+    -- Frozen: report whether work is pending, but advance nothing.
+    return #group > 0 or #runners > 0
+  end
+  dt = dt * globalTimeScale
   local hadActive = #group > 0 or #runners > 0
-  group:update(dt or 0)
+  group:update(dt)
 
   for index = #runners, 1, -1 do
     local runner = runners[index]
-    if runner then
+    if runner and not runner.paused then
       runner.elapsed = (runner.elapsed or 0) + dt
-    end
-    local wait = runner and runner.wait
-    if wait then
-      wait.remaining = wait.remaining - dt
-      if wait.remaining <= 0 then
-        runner.wait = nil
-        wait.nextStep()
+      local wait = runner.wait
+      if wait then
+        wait.remaining = wait.remaining - dt
+        if wait.remaining <= 0 then
+          runner.wait = nil
+          wait.nextStep()
+        end
       end
     end
   end
@@ -1081,6 +1245,9 @@ function Feel.clear(target)
   for index = #group, 1, -1 do
     group:remove(index)
   end
+  for index = #pausedGroup, 1, -1 do
+    pausedGroup:remove(index)
+  end
 
   for index = #runners, 1, -1 do
     cancelRunner(runners[index])
@@ -1089,11 +1256,142 @@ function Feel.clear(target)
   targets = setmetatable({}, { __mode = "k" })
   restartTargets = setmetatable({}, { __mode = "k" })
   nilRestartSlots = {}
+  globalPaused = false
+  globalTimeScale = 1
 end
 
 ---@return FeelChannel
 function Feel.channel()
   return setmetatable({ listeners = {} }, Channel)
+end
+
+-- Stop a single run started by feel.play(). Safe to call with nil.
+---@param ctx? FeelContext
+function Feel.stop(ctx)
+  local runner = ctx and ctx.runner
+  if not runner or runner.cancelled then
+    return
+  end
+  cancelRunner(runner)
+end
+
+-- Pause a single run (and its child subtree). Its tweens are parked and its
+-- waits stop counting down until resume(). Safe to call with nil.
+---@param ctx? FeelContext
+function Feel.pause(ctx)
+  local runner = ctx and ctx.runner
+  if not runner or runner.cancelled or runner.paused then
+    return
+  end
+  setSubtreePaused(runner, true)
+  moveTweens(collectRunnerTweens(runner, {}), group, pausedGroup)
+end
+
+-- Resume a previously paused run. Safe to call with nil.
+---@param ctx? FeelContext
+function Feel.resume(ctx)
+  local runner = ctx and ctx.runner
+  if not runner or runner.cancelled or not runner.paused then
+    return
+  end
+  setSubtreePaused(runner, false)
+  if isAncestorPaused(runner) then
+    -- A paused ancestor still owns the parked tweens; they un-park with it.
+    return
+  end
+  moveTweens(collectRunnerTweens(runner, {}), pausedGroup, group)
+end
+
+-- Freeze every run globally (feel.update advances nothing until resumeAll()).
+function Feel.pauseAll()
+  globalPaused = true
+end
+
+function Feel.resumeAll()
+  globalPaused = false
+end
+
+---@return boolean
+function Feel.isPausedAll()
+  return globalPaused
+end
+
+-- Scale the feel clock itself (tweens and waits). Independent of the optional
+-- feel.feedbacks time scale, which scales host game logic, not feel's clock.
+---@param scale number
+---@return number
+function Feel.setTimeScale(scale)
+  globalTimeScale = math.max(0, tonumber(scale) or 1)
+  return globalTimeScale
+end
+
+---@return number
+function Feel.timeScale()
+  return globalTimeScale
+end
+
+-- Toggle one-time deprecation warnings for redundant named field aliases.
+---@param on? boolean
+---@return boolean
+function Feel.strictAliases(on)
+  if on ~= nil then
+    warnAliases = on == true
+  end
+  return warnAliases
+end
+
+function FeelContext:stop()
+  Feel.stop(self)
+end
+
+function FeelContext:pause()
+  Feel.pause(self)
+end
+
+function FeelContext:resume()
+  Feel.resume(self)
+end
+
+---@return boolean
+function FeelContext:isPaused()
+  local runner = self.runner
+  return runner ~= nil and runner.paused == true and not runner.cancelled
+end
+
+---@return boolean
+function FeelContext:isPlaying()
+  local runner = self.runner
+  return runner ~= nil and not runner.cancelled
+end
+
+-- Run a callback when this run completes. Fires immediately if already done.
+---@param fn fun(ctx: FeelContext)
+---@return FeelContext
+function FeelContext:onComplete(fn)
+  local runner = self.runner
+  if type(fn) == "function" and runner then
+    if runner.finished then
+      fn(self)
+    elseif not runner.cancelled then
+      runner.onComplete[#runner.onComplete + 1] = fn
+    end
+  end
+  return self
+end
+
+-- Run a callback when this run is stopped/cancelled (not on normal completion).
+---@param fn fun(ctx: FeelContext)
+---@return FeelContext
+function FeelContext:onStop(fn)
+  local runner = self.runner
+  if type(fn) == "function" and runner then
+    if runner.cancelled and not runner.finished then
+      fn(self)
+    elseif not runner.cancelled then
+      runner.onStop[#runner.onStop + 1] = fn
+    end
+  end
+  return self
 end
 
 Feel.flux = flux

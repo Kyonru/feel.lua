@@ -115,10 +115,10 @@ describe("feel.love", function()
           calls[#calls + 1] = { "newCanvas", width, height, canvas }
           return canvas
         end,
-        newShader = function(source)
+        newShader = function(src)
           local value = shader("post-" .. tostring(#calls + 1))
-          value.source = source
-          calls[#calls + 1] = { "newShader", source, value }
+          value.source = src
+          calls[#calls + 1] = { "newShader", src, value }
           return value
         end,
         setCanvas = function(value)

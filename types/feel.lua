@@ -8,6 +8,15 @@
 ---@field isPlaying fun(target?: FeelTarget, key?: string|number|table): boolean
 ---@field validate fun(sequence: FeelSequenceInput): boolean, string?
 ---@field channel fun(): FeelChannel
+---@field stop fun(ctx?: FeelContext)
+---@field pause fun(ctx?: FeelContext)
+---@field resume fun(ctx?: FeelContext)
+---@field pauseAll fun()
+---@field resumeAll fun()
+---@field isPausedAll fun(): boolean
+---@field setTimeScale fun(scale: number): number
+---@field timeScale fun(): number
+---@field strictAliases fun(on?: boolean): boolean
 local feel = {}
 
 ---@class FeelTargetMeta
@@ -24,6 +33,13 @@ local feel = {}
 ---@field source any
 ---@field opts FeelPlayOptions
 ---@field runner FeelRunner
+---@field stop fun(self: FeelContext)
+---@field pause fun(self: FeelContext)
+---@field resume fun(self: FeelContext)
+---@field isPaused fun(self: FeelContext): boolean
+---@field isPlaying fun(self: FeelContext): boolean
+---@field onComplete fun(self: FeelContext, fn: fun(ctx: FeelContext)): FeelContext
+---@field onStop fun(self: FeelContext, fn: fun(ctx: FeelContext)): FeelContext
 
 ---@class FeelPlayOptions
 ---@field trigger? string
@@ -59,6 +75,8 @@ local feel = {}
 ---@field tweens table[]
 ---@field elapsed number
 ---@field cancelled? boolean
+---@field finished? boolean
+---@field paused? boolean
 
 ---@class FeelActiveRun
 ---@field target? FeelTarget
@@ -228,6 +246,33 @@ function feel.clear(target) end
 
 ---@return FeelChannel
 function feel.channel() end
+
+---@param ctx? FeelContext
+function feel.stop(ctx) end
+
+---@param ctx? FeelContext
+function feel.pause(ctx) end
+
+---@param ctx? FeelContext
+function feel.resume(ctx) end
+
+function feel.pauseAll() end
+
+function feel.resumeAll() end
+
+---@return boolean
+function feel.isPausedAll() end
+
+---@param scale number
+---@return number
+function feel.setTimeScale(scale) end
+
+---@return number
+function feel.timeScale() end
+
+---@param on? boolean
+---@return boolean
+function feel.strictAliases(on) end
 
 ---@param intent string
 ---@param handler FeelFeedbackHandler

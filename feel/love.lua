@@ -1662,7 +1662,7 @@ function Adapter:drawPost(drawScene)
       sendShader(shader, "bloomTex", canvases.bloomA)
       sendShader(shader, "intensity", bloom.target.values.intensity or 0)
     end)
-    current, nextCanvas = nextCanvas, current == canvases.workA and canvases.workB or canvases.workA
+    current = nextCanvas
   end
 
   white()
