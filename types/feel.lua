@@ -8,6 +8,7 @@
 ---@field isPlaying fun(target?: FeelTarget, key?: string|number|table): boolean
 ---@field validate fun(sequence: FeelSequenceInput): boolean, string?
 ---@field channel fun(): FeelChannel
+---@field spring fun(x?: number, stiffness?: number, damping?: number): FeelSpring
 ---@field stop fun(ctx?: FeelContext)
 ---@field pause fun(ctx?: FeelContext)
 ---@field resume fun(ctx?: FeelContext)
@@ -102,6 +103,33 @@ local feel = {}
 ---@field onUpdate? fun(values: table<string, number>, ctx: FeelContext)
 ---@field onComplete? fun(values: table<string, number>, ctx: FeelContext)
 
+---@class FeelSpringStep
+---@field kind "spring"
+---@field to? table<string, number>
+---@field pull? table<string, number>
+---@field from? table<string, number>
+---@field stiffness? number
+---@field k? number
+---@field damping? number
+---@field d? number
+---@field settle? number
+---@field epsilon? number
+---@field duration? number
+---@field onStart? fun(values: table<string, number>, ctx: FeelContext)
+---@field onUpdate? fun(values: table<string, number>, ctx: FeelContext)
+---@field onComplete? fun(values: table<string, number>, ctx: FeelContext)
+
+---@class FeelSpring
+---@field x number
+---@field v number
+---@field target number
+---@field k number
+---@field d number
+---@field update fun(self: FeelSpring, dt: number): number
+---@field pull fun(self: FeelSpring, force: number, stiffness?: number, damping?: number): FeelSpring
+---@field animate fun(self: FeelSpring, target: number, stiffness?: number, damping?: number): FeelSpring
+---@field settled fun(self: FeelSpring, epsilon?: number): boolean
+
 ---@class FeelWaitStep
 ---@field kind "wait"|"pause"
 ---@field duration? number
@@ -187,6 +215,7 @@ local feel = {}
 
 ---@alias FeelStepKind
 ---| '"animate"'
+---| '"spring"'
 ---| '"wait"'
 ---| '"pause"'
 ---| '"emit"'
@@ -199,7 +228,7 @@ local feel = {}
 ---| '"log"'
 ---@alias FeelSideEffectStep FeelEmitStep|FeelAudioStep|FeelCallbackStep|FeelLogStep
 ---@alias FeelControlStep FeelPlayStep|FeelParallelStep|FeelRepeatStep|FeelRandomStep
----@alias FeelStep FeelAnimateStep|FeelWaitStep|FeelSideEffectStep|FeelControlStep|table
+---@alias FeelStep FeelAnimateStep|FeelSpringStep|FeelWaitStep|FeelSideEffectStep|FeelControlStep|table
 ---@alias FeelStepInput FeelStep|fun(ctx: FeelContext)|string|number|boolean|nil
 ---@alias FeelSequenceInput string|FeelStepInput|FeelStepInput[]|nil|false
 

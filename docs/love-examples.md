@@ -63,6 +63,7 @@ Readers and documentation deploy jobs do not need LOVE or FFmpeg; they use the c
 - `scenes/post_processing.lua`: canvas-backed post effects driven by `post.set`, `post.tween`, `post.weight`, and `post.clear`.
 - `scenes/haptics.lua`: registered joystick rumble plus mobile/system vibration driven by `haptic.play`, `haptic.stop`, and `haptic.vibrate`.
 - `scenes/camera_screen.lua`: `camera.shake`, `camera.move`, `camera.zoom`, `camera.reset`, `screen.flash`, `screen.fade`, and `screen.clear`.
+- `scenes/spring.lua`: `spring` steps using `pull`, `to`, and `from` with different stiffness/damping values.
 
 ## Adding A Scene
 

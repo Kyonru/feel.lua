@@ -25,6 +25,7 @@ local validator = require(prefix .. ".validate")
 ---@field isPlaying fun(target?: FeelTarget, key?: string|number|table): boolean
 ---@field clear fun(target?: FeelTarget)
 ---@field channel fun(): FeelChannel
+---@field spring fun(x?: number, stiffness?: number, damping?: number): FeelSpring
 ---@field stop fun(ctx?: FeelContext)
 ---@field pause fun(ctx?: FeelContext)
 ---@field resume fun(ctx?: FeelContext)
@@ -131,6 +132,33 @@ local Feel = {}
 ---@field onUpdate? fun(values: table<string, number>, ctx: FeelContext)
 ---@field onComplete? fun(values: table<string, number>, ctx: FeelContext)
 
+---@class FeelSpringStep
+---@field kind "spring"
+---@field to? table<string, number>
+---@field pull? table<string, number>
+---@field from? table<string, number>
+---@field stiffness? number
+---@field k? number
+---@field damping? number
+---@field d? number
+---@field settle? number
+---@field epsilon? number
+---@field duration? number
+---@field onStart? fun(values: table<string, number>, ctx: FeelContext)
+---@field onUpdate? fun(values: table<string, number>, ctx: FeelContext)
+---@field onComplete? fun(values: table<string, number>, ctx: FeelContext)
+
+---@class FeelSpring
+---@field x number
+---@field v number
+---@field target number
+---@field k number
+---@field d number
+---@field update fun(self: FeelSpring, dt: number): number
+---@field pull fun(self: FeelSpring, force: number, stiffness?: number, damping?: number): FeelSpring
+---@field animate fun(self: FeelSpring, target: number, stiffness?: number, damping?: number): FeelSpring
+---@field settled fun(self: FeelSpring, epsilon?: number): boolean
+
 ---@class FeelWaitStep
 ---@field kind "wait"|"pause"
 ---@field duration? number
@@ -225,6 +253,7 @@ local Feel = {}
 
 ---@alias FeelStepKind
 ---| '"animate"'
+---| '"spring"'
 ---| '"wait"'
 ---| '"pause"'
 ---| '"emit"'
@@ -237,7 +266,7 @@ local Feel = {}
 ---| '"log"'
 ---@alias FeelSideEffectStep FeelEmitStep|FeelAudioStep|FeelCallbackStep|FeelLogStep
 ---@alias FeelControlStep FeelPlayStep|FeelParallelStep|FeelRepeatStep|FeelRandomStep
----@alias FeelStep FeelAnimateStep|FeelWaitStep|FeelSideEffectStep|FeelControlStep|table
+---@alias FeelStep FeelAnimateStep|FeelSpringStep|FeelWaitStep|FeelSideEffectStep|FeelControlStep|table
 ---@alias FeelStepInput FeelStep|fun(ctx: FeelContext)|string|number|boolean|nil
 ---@alias FeelSequenceInput string|FeelStepInput|FeelStepInput[]|nil|false
 
@@ -249,6 +278,10 @@ local pausedGroup = flux.group()
 local registry = {}
 local targets = setmetatable({}, { __mode = "k" })
 local runners = {}
+-- Active `spring` step runs. Unlike `animate` (a flux tween), a spring is a
+-- stateful integrator stepped by hand in Feel.update. Each entry is also tracked
+-- on its runner (runner.springs) so cancel/clear tears it down with the run.
+local springRuns = {}
 local restartTargets = setmetatable({}, { __mode = "k" })
 local nilRestartSlots = {}
 local globalPaused = false
@@ -328,6 +361,77 @@ end
 
 local function isArray(value)
   return type(value) == "table" and value[1] ~= nil
+end
+
+-- A damped harmonic oscillator (Hooke's law + viscous damping), integrated with
+-- semi-implicit Euler. This is the raw juice primitive: `pull` tugs the value so
+-- it bounces around its anchor (impacts), `animate` moves the anchor so the value
+-- springs toward a new rest (transitions). See feel.spring and the "spring" step.
+local Spring = {}
+Spring.__index = Spring
+
+local DEFAULT_STIFFNESS = 150
+local DEFAULT_DAMPING = 10
+local DEFAULT_SETTLE = 0.01
+
+local function newSpring(x, stiffness, damping)
+  return setmetatable({
+    x = x or 0,
+    target = x or 0,
+    v = 0,
+    k = stiffness or DEFAULT_STIFFNESS,
+    d = damping or DEFAULT_DAMPING,
+  }, Spring)
+end
+
+---@param dt number
+---@return number
+function Spring:update(dt)
+  local a = -self.k * (self.x - self.target) - self.d * self.v
+  self.v = self.v + a * dt
+  self.x = self.x + self.v * dt
+  return self.x
+end
+
+-- Displace the value by `force` (and optionally retune k/d) so it springs back
+-- to the unchanged anchor. Use for impact punches.
+---@param force number
+---@param stiffness? number
+---@param damping? number
+---@return FeelSpring
+function Spring:pull(force, stiffness, damping)
+  if stiffness then
+    self.k = stiffness
+  end
+  if damping then
+    self.d = damping
+  end
+  self.x = self.x + force
+  return self
+end
+
+-- Move the anchor (rest target) so the value springs toward it. Use for
+-- transitions. Unlike pull, this changes where the value settles.
+---@param target number
+---@param stiffness? number
+---@param damping? number
+---@return FeelSpring
+function Spring:animate(target, stiffness, damping)
+  if stiffness then
+    self.k = stiffness
+  end
+  if damping then
+    self.d = damping
+  end
+  self.target = target
+  return self
+end
+
+---@param epsilon? number
+---@return boolean
+function Spring:settled(epsilon)
+  epsilon = epsilon or DEFAULT_SETTLE
+  return math.abs(self.x - self.target) < epsilon and math.abs(self.v) < epsilon
 end
 
 local function normalizeStep(step)
@@ -447,6 +551,28 @@ local function removeRunner(runner)
   end
 end
 
+local function removeSpringRun(run)
+  for index = #springRuns, 1, -1 do
+    if springRuns[index] == run then
+      table.remove(springRuns, index)
+      return
+    end
+  end
+end
+
+local function removeRunnerSpring(runner, run)
+  local list = runner.springs
+  if not list then
+    return
+  end
+  for index = #list, 1, -1 do
+    if list[index] == run then
+      table.remove(list, index)
+      return
+    end
+  end
+end
+
 local function removeChildRunner(parent, child)
   if not parent or not parent.children then
     return
@@ -504,6 +630,26 @@ local function stepCount(step)
     warnAlias("count", "times")
   end
   return step.count or step.times or 1
+end
+
+-- Spring tuning resolvers. `k`/`d`/`epsilon` are first-class short forms (common
+-- in game-feel code), so they are not treated as deprecated aliases.
+local function stepStiffness(step)
+  return step.stiffness or step.k or DEFAULT_STIFFNESS
+end
+
+local function stepDamping(step)
+  return step.damping or step.d or DEFAULT_DAMPING
+end
+
+local function stepSettle(step)
+  return step.settle or step.epsilon or DEFAULT_SETTLE
+end
+
+-- Optional hard cap: force-settle a spring after this many seconds even if it
+-- has not reached its threshold. nil means run until settled.
+local function stepSpringCap(step)
+  return step.duration or step.time
 end
 
 local function stepCallback(step)
@@ -690,6 +836,18 @@ local function cancelRunner(runner)
   end
   runner.tweens = {}
 
+  for _, run in ipairs(runner.springs or {}) do
+    run.done = true
+    if run.state then
+      run.state.active = math.max(0, (run.state.active or 1) - 1)
+      if run.state.active == 0 and isIdentity(run.state.values) then
+        targets[run.state.target] = nil
+      end
+    end
+    removeSpringRun(run)
+  end
+  runner.springs = {}
+
   for _, child in ipairs(runner.children or {}) do
     cancelRunner(child)
   end
@@ -745,6 +903,74 @@ local function isAncestorPaused(runner)
     parent = parent.parent
   end
   return false
+end
+
+-- Finish a spring run: snap each field to its exact rest, decrement the target's
+-- active count (cleaning up identity targets), drop the run, and advance the
+-- sequence. Mirrors the animate tween's oncomplete bookkeeping.
+local function settleSpringRun(run)
+  if run.done then
+    return
+  end
+  run.done = true
+
+  for _, field in ipairs(run.fields) do
+    run.state.values[field.key] = field.rest
+  end
+
+  run.state.active = math.max(0, (run.state.active or 1) - 1)
+  removeRunnerSpring(run.runner, run)
+  removeSpringRun(run)
+
+  if run.step.onComplete then
+    run.step.onComplete(run.state.values, run.ctx)
+  end
+  if run.state.active == 0 and isIdentity(run.state.values) then
+    targets[run.state.target] = nil
+  end
+  if run.opts.markDirty then
+    run.opts.markDirty(run.ctx)
+  end
+
+  run.nextStep()
+end
+
+-- Advance one spring run by dt: integrate every field's spring, write the values
+-- back onto the target, and settle once all fields are within threshold (or the
+-- optional duration cap is hit).
+local function stepSpringRun(run, dt)
+  if run.done or run.runner.cancelled then
+    return
+  end
+
+  if not run.started then
+    run.started = true
+    if run.step.onStart then
+      run.step.onStart(run.state.values, run.ctx)
+    end
+  end
+
+  run.elapsed = run.elapsed + dt
+
+  local settled = true
+  for _, field in ipairs(run.fields) do
+    local value = field.spring:update(dt)
+    run.state.values[field.key] = value
+    if not field.spring:settled(run.settle) then
+      settled = false
+    end
+  end
+
+  if run.step.onUpdate then
+    run.step.onUpdate(run.state.values, run.ctx)
+  end
+  if run.opts.markDirty then
+    run.opts.markDirty(run.ctx)
+  end
+
+  if settled or (run.cap and run.elapsed >= run.cap) then
+    settleSpringRun(run)
+  end
 end
 
 local function childTarget(ctx, step)
@@ -879,6 +1105,77 @@ local function runStep(runner, step, nextStep)
       state = state,
       tween = tween,
     }
+    if opts.markDirty then
+      opts.markDirty(ctx)
+    end
+    return
+  end
+
+  if kind == "spring" then
+    local state = stateFor(ctx.target)
+    if step.from then
+      applyFields(state.values, step.from)
+    end
+
+    local stiffness = stepStiffness(step)
+    local damping = stepDamping(step)
+    local toMap = copyNumericFields(step.to)
+    local pullMap = copyNumericFields(step.pull)
+
+    -- Build one spring per driven field. `to` sets the rest anchor; `pull` is an
+    -- instantaneous displacement that springs back toward that anchor (the
+    -- current value when there is no `to`).
+    local fields = {}
+    local seen = {}
+    local function addField(key)
+      if seen[key] then
+        return
+      end
+      seen[key] = true
+      local current = state.values[key]
+      if current == nil then
+        current = DEFAULTS[key] or 0
+      end
+      local rest = toMap[key]
+      if rest == nil then
+        rest = current
+      end
+      local startX = current + (pullMap[key] or 0)
+      local spring = newSpring(startX, stiffness, damping)
+      spring.target = rest
+      state.values[key] = startX
+      fields[#fields + 1] = { key = key, spring = spring, rest = rest }
+    end
+    for key in pairs(toMap) do
+      addField(key)
+    end
+    for key in pairs(pullMap) do
+      addField(key)
+    end
+
+    if #fields == 0 then
+      nextStep()
+      return
+    end
+
+    state.active = (state.active or 0) + 1
+    local run = {
+      runner = runner,
+      state = state,
+      step = step,
+      ctx = ctx,
+      opts = opts,
+      fields = fields,
+      settle = stepSettle(step),
+      cap = stepSpringCap(step),
+      elapsed = 0,
+      started = false,
+      nextStep = nextStep,
+    }
+    runner.springs = runner.springs or {}
+    runner.springs[#runner.springs + 1] = run
+    springRuns[#springRuns + 1] = run
+
     if opts.markDirty then
       opts.markDirty(ctx)
     end
@@ -1149,11 +1446,26 @@ function Feel.update(dt)
   dt = dt or 0
   if globalPaused then
     -- Frozen: report whether work is pending, but advance nothing.
-    return #group > 0 or #runners > 0
+    return #group > 0 or #runners > 0 or #springRuns > 0
   end
   dt = dt * globalTimeScale
-  local hadActive = #group > 0 or #runners > 0
+  local hadActive = #group > 0 or #runners > 0 or #springRuns > 0
   group:update(dt)
+
+  -- Step springs. Iterate a snapshot: settling a run calls nextStep, which may
+  -- start new springs/tweens we should not advance until the next frame.
+  if #springRuns > 0 then
+    local pending = {}
+    for index = 1, #springRuns do
+      pending[index] = springRuns[index]
+    end
+    for index = 1, #pending do
+      local run = pending[index]
+      if not run.done and not run.runner.cancelled and not run.runner.paused and not isAncestorPaused(run.runner) then
+        stepSpringRun(run, dt)
+      end
+    end
+  end
 
   for index = #runners, 1, -1 do
     local runner = runners[index]
@@ -1170,7 +1482,7 @@ function Feel.update(dt)
     end
   end
 
-  return hadActive or #group > 0 or #runners > 0
+  return hadActive or #group > 0 or #runners > 0 or #springRuns > 0
 end
 
 ---@return FeelActiveRun[]
@@ -1255,6 +1567,7 @@ function Feel.clear(target)
     cancelRunner(runners[index])
   end
   runners = {}
+  springRuns = {}
   targets = setmetatable({}, { __mode = "k" })
   restartTargets = setmetatable({}, { __mode = "k" })
   nilRestartSlots = {}
@@ -1265,6 +1578,17 @@ end
 ---@return FeelChannel
 function Feel.channel()
   return setmetatable({ listeners = {} }, Channel)
+end
+
+-- Create a raw spring you drive yourself (call spring:update(dt) each frame).
+-- Use this when you need spring motion outside a sequence; inside sequences use
+-- the "spring" step instead, which feel.update advances for you.
+---@param x? number
+---@param stiffness? number
+---@param damping? number
+---@return FeelSpring
+function Feel.spring(x, stiffness, damping)
+  return newSpring(x, stiffness, damping)
 end
 
 -- Stop a single run started by feel.play(). Safe to call with nil.

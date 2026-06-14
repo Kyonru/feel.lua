@@ -2,6 +2,7 @@ local M = {}
 
 local STEP_KINDS = {
   animate = true,
+  spring = true,
   wait = true,
   pause = true,
   emit = true,
@@ -90,6 +91,27 @@ function M.new(normalizeStep, getSequence)
       end
       if normalized.delay ~= nil and type(normalized.delay) ~= "number" then
         return fail(fieldPath(path, "delay"), "must be a number")
+      end
+    elseif kind == "spring" then
+      local ok, err = validateNumberMap(normalized.to, fieldPath(path, "to"))
+      if not ok then
+        return ok, err
+      end
+      ok, err = validateNumberMap(normalized.pull, fieldPath(path, "pull"))
+      if not ok then
+        return ok, err
+      end
+      ok, err = validateNumberMap(normalized.from, fieldPath(path, "from"))
+      if not ok then
+        return ok, err
+      end
+      if normalized.to == nil and normalized.pull == nil then
+        return fail(path, "spring step requires 'to' or 'pull'")
+      end
+      for _, field in ipairs({ "stiffness", "k", "damping", "d", "settle", "epsilon", "duration" }) do
+        if normalized[field] ~= nil and type(normalized[field]) ~= "number" then
+          return fail(fieldPath(path, field), "must be a number")
+        end
       end
     elseif kind == "wait" or kind == "pause" then
       if normalized.duration ~= nil and type(normalized.duration) ~= "number" then

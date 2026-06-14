@@ -967,4 +967,119 @@ describe("feel.lua", function()
       assert.are.equal(1, fnWarnings) -- deduped on the second use
     end)
   end)
+
+  describe("spring", function()
+    -- Overdamped (zeta > 1) so motion is monotonic and settles fast/deterministically.
+    local STIFF, DAMP = 200, 40
+
+    local function runUntil(predicate, target)
+      for _ = 1, 2000 do
+        if predicate() then
+          return true
+        end
+        feel.update(1 / 60)
+      end
+      return predicate()
+    end
+
+    it("validates spring steps and requires to or pull", function()
+      assert.is_true(feel.validate({ kind = "spring", to = { scale = 1.2 } }))
+      assert.is_true(feel.validate({ kind = "spring", pull = { scale = 0.3 } }))
+
+      local ok, err = feel.validate({ kind = "spring" })
+      assert.is_false(ok)
+      assert.is_truthy(err:find("requires 'to' or 'pull'", 1, true))
+
+      ok = feel.validate({ kind = "spring", to = { scale = "big" } })
+      assert.is_false(ok)
+
+      ok = feel.validate({ kind = "spring", to = { scale = 1 }, stiffness = "hard" })
+      assert.is_false(ok)
+    end)
+
+    it("animates a target value to its rest and advances the sequence", function()
+      local events = {}
+      local target = feel.target({ values = { x = 0 } })
+
+      feel.play({
+        { kind = "spring", to = { x = 10 }, stiffness = STIFF, damping = DAMP },
+        { kind = "emit", event = "settled" },
+      }, target, {
+        emit = function(event)
+          events[#events + 1] = event.kind
+        end,
+      })
+
+      assert.is_true(runUntil(function()
+        return #events > 0
+      end))
+      assert.are.same({ "settled" }, events)
+      assert.are.equal(10, target.values.x) -- snapped exactly on settle
+    end)
+
+    it("pull displaces immediately then springs back to the anchor", function()
+      local target = feel.target({ values = { scale = 1 } })
+
+      feel.play({ { kind = "spring", pull = { scale = 0.5 }, stiffness = STIFF, damping = DAMP } }, target)
+
+      -- pull is applied before the first update, so the punch is visible at once
+      assert.are.equal(1.5, target.values.scale)
+
+      assert.is_true(runUntil(function()
+        return not feel.isPlaying(target)
+      end))
+      assert.are.equal(1, target.values.scale) -- returns to its rest anchor
+    end)
+
+    it("freezes while paused and resumes in place", function()
+      local target = feel.target({ values = { x = 0 } })
+      local ctx = feel.play({
+        { kind = "spring", to = { x = 10 }, stiffness = STIFF, damping = DAMP },
+      }, target)
+
+      feel.update(1 / 60)
+      local moved = target.values.x
+      assert.is_true(moved > 0)
+
+      ctx:pause()
+      for _ = 1, 10 do
+        feel.update(1 / 60)
+      end
+      assert.are.equal(moved, target.values.x) -- no progress while paused
+
+      ctx:resume()
+      assert.is_true(runUntil(function()
+        return not feel.isPlaying(target)
+      end))
+      assert.are.equal(10, target.values.x)
+    end)
+
+    it("clear cancels active springs and the target stops changing", function()
+      local target = feel.target({ values = { x = 0 } })
+      feel.play({ { kind = "spring", to = { x = 10 }, stiffness = STIFF, damping = DAMP } }, target)
+
+      feel.update(1 / 60)
+      feel.clear()
+      local frozen = target.values.x
+
+      feel.update(1 / 60)
+      assert.are.equal(frozen, target.values.x)
+      assert.is_false(feel.isPlaying(target))
+    end)
+
+    it("exposes a raw spring primitive driven by hand", function()
+      local spring = feel.spring(0, STIFF, DAMP)
+      spring:animate(10)
+
+      for _ = 1, 2000 do
+        if spring:settled() then
+          break
+        end
+        spring:update(1 / 60)
+      end
+
+      assert.is_true(spring:settled())
+      assert.is_true(math.abs(spring.x - 10) < 0.01)
+    end)
+  end)
 end)

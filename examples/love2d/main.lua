@@ -11,6 +11,7 @@ local scenes = {
 	require("scenes.particles"),
 	require("scenes.shaders"),
 	require("scenes.post_processing"),
+	require("scenes.spring"),
 	require("scenes.haptics"),
 	require("scenes.camera_screen"),
 }
