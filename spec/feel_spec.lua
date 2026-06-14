@@ -657,4 +657,314 @@ describe("feel.lua", function()
     assert.are.equal("function", type(nested.play))
     assert.are.equal("table", type(package.loaded[nestedPrefix .. ".vendor.flux"]))
   end)
+
+  describe("per-run control", function()
+    it("pauses one run while others keep advancing, then resumes to completion", function()
+      local a = feel.target()
+      local b = feel.target()
+
+      local ctx = feel.play({ { kind = "animate", to = { x = 10 }, duration = 0.1 } }, a)
+      feel.play({ { kind = "animate", to = { x = 10 }, duration = 0.1 } }, b)
+
+      feel.update(0.05)
+      local frozen = a.values.x
+      assert.is_true(frozen > 0 and frozen < 10)
+
+      ctx:pause()
+      assert.is_true(ctx:isPaused())
+
+      feel.update(0.05)
+      assert.are.equal(frozen, a.values.x) -- paused run is frozen
+      assert.are.equal(10, b.values.x) -- other run completed
+
+      ctx:resume()
+      assert.is_false(ctx:isPaused())
+      feel.update(0.1)
+      assert.are.equal(10, a.values.x)
+    end)
+
+    it("freezes a waiting step while paused", function()
+      local fired = {}
+      local ctx = feel.play({
+        { kind = "wait", duration = 0.1 },
+        { kind = "emit", event = "go" },
+      }, nil, {
+        emit = function(event)
+          fired[#fired + 1] = event.kind
+        end,
+      })
+
+      ctx:pause()
+      feel.update(0.2)
+      assert.are.same({}, fired) -- wait does not count down while paused
+
+      ctx:resume()
+      feel.update(0.1)
+      assert.are.same({ "go" }, fired)
+    end)
+
+    it("stops a run mid-flight, freezing values and skipping later steps", function()
+      local target = feel.target()
+      local fired = {}
+      local ctx = feel.play({
+        { kind = "animate", to = { x = 10 }, duration = 0.1 },
+        { kind = "emit", event = "after" },
+      }, target, {
+        emit = function(event)
+          fired[#fired + 1] = event.kind
+        end,
+      })
+
+      feel.update(0.05)
+      local frozen = target.values.x
+      ctx:stop()
+      assert.is_false(ctx:isPlaying())
+
+      feel.update(0.2)
+      assert.are.equal(frozen, target.values.x)
+      assert.are.same({}, fired)
+    end)
+
+    it("pausing a parent freezes its parallel subtree", function()
+      local target = feel.target()
+      local ctx = feel.play({
+        {
+          kind = "parallel",
+          steps = {
+            { { kind = "animate", to = { x = 10 }, duration = 0.1 } },
+            { { kind = "animate", to = { y = 10 }, duration = 0.1 } },
+          },
+        },
+      }, target)
+
+      feel.update(0.05)
+      local fx, fy = target.values.x, target.values.y
+      ctx:pause()
+
+      feel.update(0.1)
+      assert.are.equal(fx, target.values.x)
+      assert.are.equal(fy, target.values.y)
+
+      ctx:resume()
+      feel.update(0.1)
+      assert.are.equal(10, target.values.x)
+      assert.are.equal(10, target.values.y)
+    end)
+
+    it("treats free functions and methods identically, and tolerates nil", function()
+      assert.has_no.errors(function()
+        feel.stop(nil)
+        feel.pause(nil)
+        feel.resume(nil)
+      end)
+
+      local target = feel.target()
+      local ctx = feel.play({ { kind = "animate", to = { x = 10 }, duration = 0.1 } }, target)
+      feel.update(0.05)
+      feel.pause(ctx) -- free-function form
+      local frozen = target.values.x
+      feel.update(0.1)
+      assert.are.equal(frozen, target.values.x)
+      feel.resume(ctx)
+      feel.update(0.1)
+      assert.are.equal(10, target.values.x)
+    end)
+  end)
+
+  describe("global pause and time scale", function()
+    it("pauseAll freezes every run until resumeAll", function()
+      local target = feel.target()
+      feel.play({ { kind = "animate", to = { x = 10 }, duration = 0.1 } }, target)
+
+      feel.update(0.05)
+      local frozen = target.values.x
+      feel.pauseAll()
+      assert.is_true(feel.isPausedAll())
+
+      feel.update(0.2)
+      assert.are.equal(frozen, target.values.x)
+
+      feel.resumeAll()
+      assert.is_false(feel.isPausedAll())
+      feel.update(0.1)
+      assert.are.equal(10, target.values.x)
+    end)
+
+    it("setTimeScale slows tweens and waits uniformly", function()
+      local target = feel.target()
+      local fired = {}
+      assert.are.equal(0.5, feel.setTimeScale(0.5))
+
+      feel.play({ { kind = "animate", to = { x = 10 }, duration = 0.1 } }, target)
+      feel.play({
+        { kind = "wait", duration = 0.1 },
+        { kind = "emit", event = "go" },
+      }, nil, {
+        emit = function(event)
+          fired[#fired + 1] = event.kind
+        end,
+      })
+
+      feel.update(0.1) -- effective 0.05
+      assert.is_true(target.values.x > 0 and target.values.x < 10)
+      assert.are.same({}, fired)
+
+      feel.update(0.1) -- effective 0.05 more -> reaches 0.1 of scaled time
+      assert.are.equal(10, target.values.x)
+      assert.are.same({ "go" }, fired)
+    end)
+
+    it("clamps negative time scale to zero", function()
+      assert.are.equal(0, feel.setTimeScale(-2))
+    end)
+
+    it("feel.clear resets global pause and time scale", function()
+      feel.pauseAll()
+      feel.setTimeScale(0.25)
+      feel.clear()
+      assert.is_false(feel.isPausedAll())
+      assert.are.equal(1, feel.timeScale())
+    end)
+  end)
+
+  describe("run-level signals", function()
+    it("fires onComplete once when a run finishes", function()
+      local target = feel.target()
+      local completed = 0
+      local ctx = feel.play({ { kind = "animate", to = { x = 10 }, duration = 0.1 } }, target)
+      ctx:onComplete(function()
+        completed = completed + 1
+      end)
+
+      assert.are.equal(0, completed)
+      feel.update(0.1)
+      assert.are.equal(1, completed)
+      feel.update(0.1)
+      assert.are.equal(1, completed) -- no double fire
+    end)
+
+    it("fires onStop on stop but not on completion", function()
+      local target = feel.target()
+      local stops, completes = 0, 0
+      local ctx = feel.play({ { kind = "animate", to = { x = 10 }, duration = 0.1 } }, target)
+      ctx:onStop(function()
+        stops = stops + 1
+      end)
+      ctx:onComplete(function()
+        completes = completes + 1
+      end)
+
+      feel.update(0.05)
+      ctx:stop()
+      assert.are.equal(1, stops)
+      assert.are.equal(0, completes)
+    end)
+
+    it("invokes late onComplete immediately but not late onStop after completion", function()
+      local completed, stopped = false, false
+      local ctx = feel.play({ { kind = "emit", event = "x" } }, nil, {
+        emit = function() end,
+      })
+
+      -- An emit-only sequence completes synchronously during play.
+      assert.is_false(ctx:isPlaying())
+      assert.are.equal(ctx, ctx:onComplete(function()
+        completed = true
+      end))
+      ctx:onStop(function()
+        stopped = true
+      end)
+
+      assert.is_true(completed)
+      assert.is_false(stopped)
+    end)
+  end)
+
+  describe("field aliases", function()
+    it("accepts alias fields identically to canonical names", function()
+      -- duration <- time, on both animate and wait
+      local target = feel.target()
+      feel.play({ { kind = "animate", to = { x = 10 }, time = 0.1 } }, target)
+      feel.update(0.1)
+      assert.are.equal(10, target.values.x)
+
+      local fired = {}
+      feel.play({
+        { kind = "wait", time = 0.1 },
+        { kind = "emit", event = "go" },
+      }, nil, {
+        emit = function(event)
+          fired[#fired + 1] = event.kind
+        end,
+      })
+      feel.update(0.05)
+      assert.are.same({}, fired)
+      feel.update(0.05)
+      assert.are.same({ "go" }, fired)
+
+      -- count <- times, callback <- fn
+      local count = 0
+      feel.play({
+        {
+          kind = "repeat",
+          times = 3,
+          sequence = {
+            {
+              kind = "callback",
+              fn = function()
+                count = count + 1
+              end,
+            },
+          },
+        },
+      })
+      assert.are.equal(3, count)
+
+      -- weight <- chance
+      local picked
+      feel.play({
+        { kind = "random", options = { { chance = 1, sequence = { { kind = "emit", event = "hit" } } } } },
+      }, nil, {
+        emit = function(event)
+          picked = event.kind
+        end,
+      })
+      assert.are.equal("hit", picked)
+
+      -- message <- text
+      local logged
+      feel.play({ { kind = "log", text = "hello" } }, nil, {
+        log = function(message)
+          logged = message
+        end,
+      })
+      assert.are.equal("hello", logged)
+    end)
+
+    it("warns once per alias under strictAliases and stays silent otherwise", function()
+      local messages = {}
+      local realPrint = print
+      _G.print = function(message)
+        messages[#messages + 1] = message
+      end
+
+      -- silent by default
+      feel.play({ { kind = "callback", fn = function() end } })
+      assert.are.equal(0, #messages)
+
+      feel.strictAliases(true)
+      feel.play({ { kind = "callback", fn = function() end } })
+      feel.play({ { kind = "callback", fn = function() end } })
+      feel.strictAliases(false)
+      _G.print = realPrint
+
+      local fnWarnings = 0
+      for _, message in ipairs(messages) do
+        if type(message) == "string" and message:find("'fn'", 1, true) then
+          fnWarnings = fnWarnings + 1
+        end
+      end
+      assert.are.equal(1, fnWarnings) -- deduped on the second use
+    end)
+  end)
 end)

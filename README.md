@@ -9,6 +9,8 @@
 - Animates lightweight target values.
 - Emits host-owned events for particles, camera shake, flashes, sounds, haptics, shaders, and more.
 - Runs steps in order, including waits, nested sequences, repeats, random branches, and parallel groups.
+- Controls individual runs (stop, pause, resume, completion signals) and the whole clock (global pause, time scale).
+- Routes gameplay intents to feedback with lightweight `feel.channel()` pub/sub.
 - Optionally groups adapter events into named feedback stacks with `feel.feedbacks`.
 
 https://github.com/user-attachments/assets/6b15a87f-5a11-42f6-922b-ccf8bd0627f7
@@ -103,6 +105,36 @@ function love.draw()
 end
 ```
 
+## Controlling A Run
+
+`feel.play` returns a control handle, so you can stop, pause, resume, or react to a single run:
+
+```lua
+local run = feel.play("ship.charge", ship, { restart = true, key = "charge" })
+run:pause()
+run:resume()
+run:onComplete(function() print("charged") end)
+
+feel.pauseAll()        -- freeze everything
+feel.setTimeScale(0.5) -- or run the whole feel clock at half speed
+```
+
+## Routing With Channels
+
+Decouple "what happened" in gameplay from "what feedback plays" with a channel:
+
+```lua
+local feedback = feel.channel()
+
+feedback:on("enemy.killed", function(event)
+  feel.play("ship.hit", event.target, { restart = true, key = "ship.hit" })
+end)
+
+feedback:emit("enemy.killed", { target = ship })
+```
+
+There is also a no-LOVE [core example](examples/core): `lua examples/core/main.lua`.
+
 ## Docs
 
 - [Guides](https://kyonru.github.io/feel.lua)
@@ -186,5 +218,7 @@ The core stays small and table-driven. LOVE-specific work lives in optional adap
 ## Tests
 
 ```sh
-busted spec
+make test   # busted spec
+make lint   # luacheck .
+make core   # run the no-LOVE core example
 ```

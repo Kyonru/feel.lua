@@ -57,6 +57,9 @@ nav = [
     { "Sequence Steps" = "sequence-steps.md" },
     { "Feedback Authoring" = "feedbacks.md" },
     { "Autocomplete" = "autocomplete.md" },
+    { "Writing a Custom Adapter" = "custom-adapter.md" },
+    { "Best Practices" = "best-practices.md" },
+    { "Troubleshooting" = "troubleshooting.md" },
   ] },
   { "LOVE Adapter" = [
     { "Adapter Guide" = "love-adapter.md" },
@@ -65,6 +68,7 @@ nav = [
     { "Menori Helpers" = "menori.md" },
   ] },
   { "Examples" = [
+    { "Core Example" = "core-example.md" },
     { "LOVE Examples" = "love-examples.md" },
     { "Asteroidz Walkthrough" = "asteroidz.md" },
   ] },

@@ -725,11 +725,13 @@ local function setSubtreePaused(runner, paused)
 end
 
 -- Move tweens between flux groups, but only those currently parented to `from`.
+-- Note: the vendored flux module returns a wrapper whose dotted remove/add
+-- ignore their first argument, so we must call the group methods directly.
 local function moveTweens(tweens, from, to)
   for _, tween in ipairs(tweens) do
     if tween.parent == from then
-      flux.remove(from, tween)
-      flux.add(to, tween)
+      from:remove(tween)
+      to:add(tween)
     end
   end
 end

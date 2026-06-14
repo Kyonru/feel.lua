@@ -36,6 +36,10 @@ Use it when an action should read better: a button press, player hit, reward rev
 | [Post Processing](post-processing.md) | Built-in LOVE canvas effects, parameters, and recipes.                                                                            |
 | [g3d Helpers](g3d.md)                 | Optional helpers for binding `feel.target` values to groverburger/g3d models and cameras.                                         |
 | [Menori Helpers](menori.md)           | Optional helpers for binding `feel.target` values to Menori nodes, cameras, animations, and uniforms.                             |
+| [Writing a Custom Adapter](custom-adapter.md) | The adapter contract, with a minimal runnable example.                                                                    |
+| [Best Practices](best-practices.md)   | Recipe organization, easing/duration tuning, restart discipline, and reset patterns.                                              |
+| [Troubleshooting](troubleshooting.md) | Common gotchas: nothing animates, restart vs stacking, run control, validation, and version notes.                                |
+| [Core Example](core-example.md)       | A plain-Lua, no-LOVE walkthrough of the core runner.                                                                              |
 | [LOVE Examples](love-examples.md)     | Showcase scenes and feature-specific examples.                                                                                    |
 | [Asteroidz Walkthrough](asteroidz.md) | A small game showing sequences, post-processing, UI juice, and adapter events together.                                           |
 

@@ -18,6 +18,10 @@ icon: lucide/book-open
 | `feel.isPlaying(target, key)` | Returns whether a target/key slot is currently active. |
 | `feel.clear(target)` | Clears all work, or only work attached to one target. |
 | `feel.channel()` | Creates a local feedback command channel. |
+| `feel.stop/pause/resume(ctx)` | Control a single run by its play context. |
+| `feel.pauseAll/resumeAll()` | Freeze or resume every run at once. |
+| `feel.setTimeScale(s)` / `feel.timeScale()` | Scale (and read) the feel clock. |
+| `feel.strictAliases(on)` | Toggle deprecation warnings for redundant field aliases. |
 
 For More Mountains-style named feedback stacks, use the optional [`feel.feedbacks`](feedbacks.md) authoring layer on top of these core functions.
 
@@ -175,6 +179,53 @@ feedback:emit("ship.shoot", { target = ship.target })
 | `channel:clear(intent)` | Clear one intent, or all handlers when `intent` is omitted. |
 
 Channels are intentionally small and local. They are for feedback routing, not general app state, entity messaging, networking, replay, or gameplay architecture.
+
+## Run Control
+
+`feel.play` returns a control handle (the play context). These work as methods on the
+handle or as free functions taking the handle; both forms are equivalent and the free
+functions tolerate `nil`.
+
+```lua
+local run = feel.play("ship.charge", ship, { restart = true, key = "charge" })
+
+run:pause(); run:resume(); run:stop()
+-- or: feel.pause(run); feel.resume(run); feel.stop(run)
+
+run:onComplete(function(ctx) end):onStop(function(ctx) end)
+```
+
+| Method / function | Purpose |
+| --- | --- |
+| `run:stop()` / `feel.stop(run)` | Cancel the run (and its child subtree). |
+| `run:pause()` / `feel.pause(run)` | Freeze the run's tweens and waits. |
+| `run:resume()` / `feel.resume(run)` | Continue a paused run from where it stopped. |
+| `run:isPlaying()` | `true` while the run is active. |
+| `run:isPaused()` | `true` while the run is paused. |
+| `run:onComplete(fn)` | Run `fn` when the sequence finishes. Fires immediately if already done. Returns the handle. |
+| `run:onStop(fn)` | Run `fn` when the run is stopped/cancelled. Returns the handle. |
+
+## Global Pause And Time Scale
+
+```lua
+feel.pauseAll()        -- freeze every run
+feel.resumeAll()
+feel.isPausedAll()     -- boolean
+
+feel.setTimeScale(0.5) -- scale tweens and waits; returns the clamped value
+feel.timeScale()       -- read it
+```
+
+`setTimeScale` clamps to `>= 0`. This core time scale is independent of the optional
+[`feel.feedbacks`](feedbacks.md) time scale.
+
+## `feel.strictAliases(on)`
+
+Field names accept historical aliases (`time` for `duration`, `fn` for `callback`, `times`
+for `count`, `chance` for `weight`, `text` for `message`). All keep working. Call
+`feel.strictAliases(true)` during development to print a one-time deprecation notice the
+first time each redundant named alias is used. It is off by default and returns the current
+setting.
 
 ## Exposed Tables
 

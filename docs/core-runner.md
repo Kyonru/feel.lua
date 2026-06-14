@@ -98,7 +98,68 @@ end)
 feedback:emit("ship.explode", { target = ship.target })
 ```
 
+For the common "on this intent, just play this sequence" case, `channel:map` is a shortcut.
+`channel:clear(intent)` removes one intent's handlers, or all of them when called with no
+argument.
+
+```lua
+feedback:map("ship.shoot", "ship.shoot", { opts = { restart = true, key = "ship.shoot" } })
+feedback:emit("ship.shoot", { target = ship.target })
+
+feedback:clear("ship.shoot") -- or feedback:clear() to remove every handler
+```
+
 Channels are local objects. Create them where they make module boundaries cleaner, and keep gameplay state changes direct.
+
+## Controlling A Run
+
+`feel.play` returns a control handle (the play context). Use it to stop, pause, or resume
+just that run, or to react when it ends. This is finer-grained than `feel.clear(target)`,
+which stops every run on a target.
+
+```lua
+local run = feel.play("ship.charge", ship, { restart = true, key = "charge" })
+
+run:pause()        -- freeze this run (its tweens and waits) ...
+run:resume()       -- ... and continue where it left off
+run:stop()         -- cancel it outright
+
+if run:isPlaying() then end
+if run:isPaused() then end
+```
+
+Pausing a parent run also freezes its `parallel`, `play`, and `repeat` children. The same
+operations are available as free functions for code that does not keep the handle around:
+`feel.stop(ctx)`, `feel.pause(ctx)`, and `feel.resume(ctx)` (all safe to call with `nil`).
+
+Two run-level signals fire once per run and return the handle for chaining:
+
+```lua
+feel.play("ship.explode", ship)
+  :onComplete(function(ctx) print("explosion done") end)
+  :onStop(function(ctx) print("explosion cancelled") end)
+```
+
+`onComplete` fires when the whole sequence finishes; `onStop` fires when the run is stopped
+or cancelled (including restart eviction and `feel.clear`). A callback registered after the
+run already completed fires immediately.
+
+## Global Pause And Time Scale
+
+`feel.pauseAll()` freezes every run; `feel.resumeAll()` continues. `feel.setTimeScale(s)`
+scales the feel clock — both tweens and waits — uniformly, and `feel.timeScale()` reads it.
+
+```lua
+feel.pauseAll()
+feel.resumeAll()
+
+feel.setTimeScale(0.5) -- everything runs at half speed
+feel.setTimeScale(1)
+```
+
+This core time scale is independent of the optional [`feel.feedbacks`](feedbacks.md) time
+scale, which scales your *game* logic while `feel.update` still receives real `dt`. They do
+not affect each other; combine them explicitly if you want both.
 
 ## Update And Clear
 

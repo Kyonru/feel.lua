@@ -173,4 +173,12 @@ describe("feel.feedbacks", function()
     })
     assert.are.equal(1, Feedbacks.timeScale())
   end)
+
+  it("keeps the core time scale independent of the feedbacks time scale", function()
+    local Feedbacks = feelFeedbacks.new()
+
+    feel.setTimeScale(0.5)
+    assert.are.equal(0.5, feel.timeScale())
+    assert.are.equal(1, Feedbacks.timeScale()) -- feedbacks scale is untouched by the core clock
+  end)
 end)

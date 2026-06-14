@@ -93,6 +93,25 @@ end
 
 `feel.target` creates a table with a `values` table. `animate` steps tween numeric fields in that table, including custom fields like `glow`. Your draw code decides what those values mean visually.
 
+## Announcing Intents
+
+As a project grows, it helps to separate *what happened* in gameplay from *what feedback
+plays*. A channel lets gameplay code announce an intent without knowing which recipe handles
+it:
+
+```lua
+local feedback = feel.channel()
+
+feedback:on("button.press", function(event)
+  feel.play("button.press", event.target, { restart = true, key = "button.press" })
+end)
+
+-- elsewhere, in gameplay code:
+feedback:emit("button.press", { target = button })
+```
+
+See [Core Runner](core-runner.md#feedback-channels) for `map`/`clear` and more.
+
 ## Where To Go Next
 
 - [Sequence Steps](sequence-steps.md) lists every step kind and its fields.
