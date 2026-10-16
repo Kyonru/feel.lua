@@ -82,6 +82,16 @@ describe("feel.lua", function()
     end
   end)
 
+  it("reports cyclic named sequence references without recursing forever", function()
+    feel.define("cycle.one", { { kind = "play", name = "cycle.two" } })
+    feel.define("cycle.two", { { kind = "play", name = "cycle.one" } })
+
+    local ok, err = feel.validate("cycle.one")
+
+    assert.is_false(ok)
+    assert.is_truthy(err:find("cyclic sequence reference", 1, true))
+  end)
+
   it("plays inline animation sequences through flux", function()
     local target = feel.target({ label = "Launch" })
     local dirty = 0
@@ -242,6 +252,26 @@ describe("feel.lua", function()
     })
 
     assert.are.same({ "tick", "tick", "tick", "done" }, events)
+  end)
+
+  it("yields immediate forever repeats to the update loop", function()
+    local count = 0
+    local run = feel.play({
+      {
+        kind = "repeat",
+        forever = true,
+        sequence = function()
+          count = count + 1
+        end,
+      },
+    })
+
+    assert.are.equal(100, count)
+    assert.is_true(run:isPlaying())
+    feel.update(0)
+    assert.are.equal(200, count)
+    run:stop()
+    assert.is_false(run:isPlaying())
   end)
 
   it("random selects one weighted option", function()
@@ -441,6 +471,8 @@ describe("feel.lua", function()
     assert.are.equal(0.25, active[1].elapsed)
     assert.is_true(active[1].waiting)
     assert.are.equal(0.75, active[1].remaining)
+    assert.are.equal(0, active[1].springs)
+    assert.is_false(active[1].paused)
 
     active[1].index = 99
     assert.are.equal(1, feel.active()[1].index)
@@ -460,6 +492,30 @@ describe("feel.lua", function()
     feel.update(0.1)
 
     assert.is_false(feel.isPlaying(target, "pulse"))
+  end)
+
+  it("clearing a nested child target cancels its owning run tree", function()
+    local parentTarget = feel.target()
+    local childTarget = feel.target()
+    local fired = false
+
+    local parent = feel.play({
+      {
+        kind = "play",
+        target = childTarget,
+        sequence = { { kind = "wait", duration = 1 } },
+      },
+      function()
+        fired = true
+      end,
+    }, parentTarget)
+
+    feel.clear(childTarget)
+    feel.update(2)
+
+    assert.is_false(parent:isPlaying())
+    assert.is_false(fired)
+    assert.are.equal(0, #feel.active())
   end)
 
   it("restart slots are scoped by target", function()
@@ -751,6 +807,56 @@ describe("feel.lua", function()
       assert.are.equal(10, target.values.y)
     end)
 
+    it("keeps a child effectively paused while its parent is paused", function()
+      local child
+      local fired = false
+      local parent = feel.play({
+        {
+          kind = "play",
+          sequence = {
+            function(ctx)
+              child = ctx
+            end,
+            { kind = "wait", duration = 0.1 },
+            function()
+              fired = true
+            end,
+          },
+        },
+      })
+
+      parent:pause()
+      child:resume()
+      assert.is_true(parent:isPaused())
+      assert.is_true(child:isPaused())
+      feel.update(0.2)
+      assert.is_false(fired)
+
+      parent:resume()
+      feel.update(0.1)
+      assert.is_true(fired)
+    end)
+
+    it("cancels every branch when a parallel parent is stopped", function()
+      local fired = {}
+      local parent = feel.play({
+        {
+          kind = "parallel",
+          steps = {
+            { { kind = "wait", duration = 0.1 }, function() fired[#fired + 1] = "a" end },
+            { { kind = "wait", duration = 0.1 }, function() fired[#fired + 1] = "b" end },
+            { { kind = "wait", duration = 0.1 }, function() fired[#fired + 1] = "c" end },
+          },
+        },
+      })
+
+      parent:stop()
+      feel.update(0.2)
+
+      assert.are.same({}, fired)
+      assert.are.equal(0, #feel.active())
+    end)
+
     it("treats free functions and methods identically, and tolerates nil", function()
       assert.has_no.errors(function()
         feel.stop(nil)
@@ -1015,6 +1121,22 @@ describe("feel.lua", function()
       end))
       assert.are.same({ "settled" }, events)
       assert.are.equal(10, target.values.x) -- snapped exactly on settle
+    end)
+
+    it("stays stable and settles after large frame deltas", function()
+      local target = feel.target({ values = { x = 0 } })
+      feel.play({
+        { kind = "spring", to = { x = 10 }, stiffness = STIFF, damping = DAMP },
+      }, target)
+
+      for _ = 1, 30 do
+        feel.update(0.2)
+      end
+
+      assert.is_true(target.values.x == target.values.x)
+      assert.is_true(math.abs(target.values.x) < 100)
+      assert.are.equal(10, target.values.x)
+      assert.is_false(feel.isPlaying(target))
     end)
 
     it("pull displaces immediately then springs back to the anchor", function()

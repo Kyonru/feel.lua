@@ -66,7 +66,7 @@ end
 function M.new(normalizeStep, getSequence)
   local validateSequence
 
-  local function validateStep(step, path)
+  local function validateStep(step, path, activeNames)
     local normalized = normalizeStep(step)
     if type(normalized) ~= "table" then
       return fail(path, "must be a valid step")
@@ -134,14 +134,14 @@ function M.new(normalizeStep, getSequence)
       if sequence == nil or sequence == false then
         return fail(path, "play step requires a sequence")
       end
-      return validateSequence(sequence, fieldPath(path, "sequence"))
+      return validateSequence(sequence, fieldPath(path, "sequence"), activeNames)
     elseif kind == "parallel" then
       local children = normalized.steps or normalized.sequences or normalized[1]
       if not isSequenceArray(children) then
         return fail(path, "parallel step requires a non-empty array of steps")
       end
       for index, child in ipairs(children) do
-        local ok, err = validateSequence(child, arrayPath(fieldPath(path, "steps"), index))
+        local ok, err = validateSequence(child, arrayPath(fieldPath(path, "steps"), index), activeNames)
         if not ok then
           return ok, err
         end
@@ -155,7 +155,7 @@ function M.new(normalizeStep, getSequence)
       if sequence == nil or sequence == false then
         return fail(path, "repeat step requires a sequence")
       end
-      return validateSequence(sequence, fieldPath(path, "sequence"))
+      return validateSequence(sequence, fieldPath(path, "sequence"), activeNames)
     elseif kind == "random" then
       local options = normalized.options or normalized[1]
       if not isSequenceArray(options) then
@@ -175,7 +175,7 @@ function M.new(normalizeStep, getSequence)
         if sequence == nil or sequence == false then
           return fail(arrayPath(fieldPath(path, "options"), index), "random option requires a sequence")
         end
-        local ok, err = validateSequence(sequence, arrayPath(fieldPath(path, "options"), index))
+        local ok, err = validateSequence(sequence, arrayPath(fieldPath(path, "options"), index), activeNames)
         if not ok then
           return ok, err
         end
@@ -185,8 +185,9 @@ function M.new(normalizeStep, getSequence)
     return true
   end
 
-  validateSequence = function(value, path)
+  validateSequence = function(value, path, activeNames)
     path = path or "sequence"
+    activeNames = activeNames or {}
 
     if value == nil or value == false then
       return fail(path, "must be a sequence")
@@ -197,23 +198,29 @@ function M.new(normalizeStep, getSequence)
       if not sequence then
         return fail(path, "unknown sequence '" .. value .. "'")
       end
-      return validateSequence(sequence, path)
+      if activeNames[value] then
+        return fail(path, "cyclic sequence reference '" .. value .. "'")
+      end
+      activeNames[value] = true
+      local ok, err = validateSequence(sequence, path, activeNames)
+      activeNames[value] = nil
+      return ok, err
     end
 
     if type(value) == "function" or type(value) ~= "table" then
-      return validateStep(value, path)
+      return validateStep(value, path, activeNames)
     end
 
     if value.kind or value.to or value.from or value.duration or value.ease then
-      return validateStep(value, path)
+      return validateStep(value, path, activeNames)
     end
 
     if not isSequenceArray(value) then
-      return validateStep(value, path)
+      return validateStep(value, path, activeNames)
     end
 
     for index, step in ipairs(value) do
-      local ok, err = validateStep(step, arrayPath(path, index))
+      local ok, err = validateStep(step, arrayPath(path, index), activeNames)
       if not ok then
         return ok, err
       end

@@ -333,6 +333,9 @@ function FeelLoveAdapter:disablePost(effect) end
 ---@return boolean
 function FeelLoveAdapter:clearPost() end
 
+---Cancel adapter-owned feedback and restore camera, screen, shader, and post state.
+function FeelLoveAdapter:reset() end
+
 ---@param dt? number
 function FeelLoveAdapter:update(dt) end
 

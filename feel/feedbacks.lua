@@ -24,6 +24,7 @@ local FeelFeedbacks = {}
 
 local CORE_KINDS = {
   animate = true,
+  spring = true,
   wait = true,
   pause = true,
   emit = true,
@@ -210,6 +211,8 @@ local function compileCoreStep(instance, step, context)
     elseif key == "options" then
       result[key] = compileOptions(instance, value, context)
     elseif key == "step" or key == "sequence" or key == "feedback" then
+      result[key] = compileChild(instance, value, context)
+    elseif key == "name" and (step.kind == "play" or step.kind == "repeat") then
       result[key] = compileChild(instance, value, context)
     elseif key == "opts" then
       result[key] = copyOptions(value, context)

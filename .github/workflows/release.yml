@@ -48,6 +48,16 @@ jobs:
           test -f "$staging_dir/feel/init.lua"
           test -f "$staging_dir/feel/love.lua"
           test -f "$staging_dir/feel/feedbacks.lua"
+          test -f "$staging_dir/feel/g3d.lua"
+          test -f "$staging_dir/feel/menori.lua"
+          test -f "$staging_dir/feel/presets.lua"
+          test -f "$staging_dir/feel/vendor/flux.lua"
+          test -f "$staging_dir/types/feel.lua"
+          test -f "$staging_dir/types/feel-love.lua"
+          test -f "$staging_dir/types/feel-feedbacks.lua"
+          test -f "$staging_dir/types/feel-g3d.lua"
+          test -f "$staging_dir/types/feel-menori.lua"
+          test -f "$staging_dir/types/feel-presets.lua"
 
           (cd dist && zip -r -q "${package_name}.zip" "$package_name")
           unzip -l "$archive_path"

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Fixed cancellation of parallel runs so stopping or restarting a parent reliably cancels every child branch, and target-specific clear now cancels the owning run tree instead of stranding its parent.
+- Made nested pause state compositional: children remain effectively paused while an ancestor is paused, and independently paused branches stay paused when a parent resumes.
+- Stabilized raw and sequenced springs across large frame deltas by internally substepping integration.
+- Fixed `feel.feedbacks` support for core `spring` steps and nested named feedbacks.
+- Added cycle detection for named sequence validation and richer `feel.active()` spring/pause diagnostics.
+- Improved LuaLS definitions for Menori methods, LOVE adapter reset, raw springs, and the now-documented preset module.
+- Avoided redundant g3d projection matrix updates when the applied field of view has not changed.
+
 ## v1.3.0 - 2026-06-14
 
 All changes are additive and backward compatible.

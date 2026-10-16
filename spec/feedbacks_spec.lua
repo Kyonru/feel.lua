@@ -2,6 +2,7 @@ package.path = "./?.lua;./?/init.lua;" .. package.path
 
 local feel = require("feel")
 local feelFeedbacks = require("feel.feedbacks")
+local presets = require("feel.presets")
 
 describe("feel.feedbacks", function()
   before_each(function()
@@ -33,6 +34,49 @@ describe("feel.feedbacks", function()
     assert.are.equal(1.25, target.values.scale)
     assert.are.equal("screen.flash", events[1].kind)
     assert.are.equal(0.2, events[1].payload.amount)
+  end)
+
+  it("compiles spring steps as core animation instead of adapter events", function()
+    local events = {}
+    local target = feel.target({ values = { x = 0 } })
+    local Feedbacks = feelFeedbacks.new({
+      emit = function(event)
+        events[#events + 1] = event.kind
+      end,
+    })
+
+    Feedbacks.play({
+      { kind = "spring", to = { x = 10 }, stiffness = 200, damping = 40 },
+    }, { target = target })
+
+    for _ = 1, 300 do
+      feel.update(1 / 60)
+      if not feel.isPlaying(target) then
+        break
+      end
+    end
+
+    assert.are.equal(10, target.values.x)
+    assert.are.same({}, events)
+  end)
+
+  it("resolves named feedbacks nested in core play steps", function()
+    local calls = {}
+    local Feedbacks = feelFeedbacks.new()
+    Feedbacks.define("child", {
+      function()
+        calls[#calls + 1] = "child"
+      end,
+    })
+
+    Feedbacks.play({
+      { kind = "play", name = "child" },
+      function()
+        calls[#calls + 1] = "parent"
+      end,
+    })
+
+    assert.are.same({ "child", "parent" }, calls)
   end)
 
   it("resolves context paths functions and scalar ranges without randomizing color arrays", function()
@@ -180,5 +224,15 @@ describe("feel.feedbacks", function()
     feel.setTimeScale(0.5)
     assert.are.equal(0.5, feel.timeScale())
     assert.are.equal(1, Feedbacks.timeScale()) -- feedbacks scale is untouched by the core clock
+  end)
+
+  it("provides configurable starter presets", function()
+    local manifest = presets.hitHeavy({ name = "boss", shake = 0.2, freeze = 0.05 })
+
+    assert.are.equal("time.freeze", manifest[1].kind)
+    assert.are.equal(0.05, manifest[1].duration)
+    assert.are.equal("parallel", manifest[2].kind)
+    assert.are.equal(0.2, manifest[2].steps[2].amount)
+    assert.are.equal("boss", manifest[2].steps[4].name)
   end)
 end)

@@ -18,6 +18,7 @@ icon: lucide/book-open
 | `feel.isPlaying(target, key)` | Returns whether a target/key slot is currently active. |
 | `feel.clear(target)` | Clears all work, or only work attached to one target. |
 | `feel.channel()` | Creates a local feedback command channel. |
+| `feel.spring(x, stiffness, damping)` | Creates a raw damped spring for values outside sequences. |
 | `feel.stop/pause/resume(ctx)` | Control a single run by its play context. |
 | `feel.pauseAll/resumeAll()` | Freeze or resume every run at once. |
 | `feel.setTimeScale(s)` / `feel.timeScale()` | Scale (and read) the feel clock. |
@@ -135,7 +136,8 @@ end
 | `index` / `count` | Current step index and total normalized steps. |
 | `elapsed` | Seconds since this runner started. |
 | `waiting` / `remaining` | Whether the runner is in a wait step, and seconds left when it is. |
-| `tweens` / `children` | Number of active tweens and child runners owned by this runner. |
+| `tweens` / `springs` / `children` | Number of active tweens, springs, and child runners owned by this runner. |
+| `paused` | Whether this runner is paused directly or through a paused parent. |
 
 ## `feel.isPlaying(target, key)`
 
@@ -149,7 +151,7 @@ end
 
 ## `feel.clear(target)`
 
-Clears registered sequences, active tween state, waits, nested sequences, repeats, and parallel branches. When given a target, it stops that target's active tweens and cancels active sequences using that target.
+Clears registered sequences, active tween state, waits, nested sequences, repeats, and parallel branches. When given a target, it stops that target's active work. If the target belongs to a nested branch, the owning root run is cancelled too, so its parent cannot remain stuck waiting for a removed child.
 
 ```lua
 feel.clear()
@@ -179,6 +181,24 @@ feedback:emit("ship.shoot", { target = ship.target })
 | `channel:clear(intent)` | Clear one intent, or all handlers when `intent` is omitted. |
 
 Channels are intentionally small and local. They are for feedback routing, not general app state, entity messaging, networking, replay, or gameplay architecture.
+
+## `feel.spring(x, stiffness, damping)`
+
+Creates a damped spring that you advance yourself. Use the `spring` sequence step when
+the scheduler should own it; use this primitive for a value managed directly by your game.
+
+```lua
+local recoil = feel.spring(0, 180, 18)
+recoil:pull(8)
+
+function love.update(dt)
+  weapon.recoil = recoil:update(dt)
+end
+```
+
+`spring:animate(target)` moves its rest position, `spring:pull(force)` displaces it around
+the current rest position, and `spring:settled(epsilon)` reports when motion is negligible.
+Large frame deltas are internally substepped to keep the spring stable.
 
 ## Run Control
 

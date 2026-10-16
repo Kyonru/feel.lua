@@ -302,13 +302,13 @@ function feelMenori.new(menori, opts) end
 ---@param node FeelMenoriNodeLike
 ---@param opts? FeelMenoriNodeOptions
 ---@return FeelTarget
-function FeelMenoriAdapter.node(name, node, opts) end
+function FeelMenoriAdapter:node(name, node, opts) end
 
 ---@param name string
 ---@param node FeelMenoriNodeLike
 ---@param opts? FeelMenoriNodeOptions
 ---@return FeelTarget
-function FeelMenoriAdapter.model(name, node, opts) end
+function FeelMenoriAdapter:model(name, node, opts) end
 
 ---@overload fun(self: FeelMenoriAdapter, opts?: FeelMenoriCameraOptions): FeelTarget
 ---@overload fun(self: FeelMenoriAdapter, camera: FeelMenoriCameraLike, opts?: FeelMenoriCameraOptions): FeelTarget
@@ -316,41 +316,41 @@ function FeelMenoriAdapter.model(name, node, opts) end
 ---@param cameraOrEnvironment? FeelMenoriCameraLike|FeelMenoriEnvironmentLike|FeelMenoriCameraOptions
 ---@param opts? FeelMenoriCameraOptions
 ---@return FeelTarget
-function FeelMenoriAdapter.camera(cameraOrEnvironment, opts) end
+function FeelMenoriAdapter:camera(cameraOrEnvironment, opts) end
 
 ---@param name string
 ---@param animations FeelMenoriAnimationsLike
 ---@param opts? FeelMenoriAnimationOptions
 ---@return FeelTarget
-function FeelMenoriAdapter.animation(name, animations, opts) end
+function FeelMenoriAdapter:animation(name, animations, opts) end
 
 ---@param name string
 ---@param object FeelMenoriUniformListLike
 ---@param uniform string
 ---@param opts? FeelMenoriUniformOptions
 ---@return FeelTarget
-function FeelMenoriAdapter.uniform(name, object, uniform, opts) end
+function FeelMenoriAdapter:uniform(name, object, uniform, opts) end
 
 ---@param name string
 ---@return FeelMenoriNodeEntry|FeelMenoriAnimationEntry|FeelMenoriUniformEntry?
-function FeelMenoriAdapter.get(name) end
+function FeelMenoriAdapter:get(name) end
 
 ---@param name? string
 ---@return boolean
-function FeelMenoriAdapter.clear(name) end
+function FeelMenoriAdapter:clear(name) end
 
 ---@param dt? number
 ---@return FeelMenoriAdapter
-function FeelMenoriAdapter.update(dt) end
+function FeelMenoriAdapter:update(dt) end
 
 ---@param event? FeelMenoriEvent
 ---@param ctx? any
 ---@return boolean
 ---@return any ctx
-function FeelMenoriAdapter.emit(event, ctx) end
+function FeelMenoriAdapter:emit(event, ctx) end
 
 ---@param extra? FeelMenoriHandlers
 ---@return FeelMenoriHandlers
-function FeelMenoriAdapter.handlers(extra) end
+function FeelMenoriAdapter:handlers(extra) end
 
 return feelMenori

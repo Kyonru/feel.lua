@@ -259,9 +259,13 @@ local function applyCamera(entry, camera)
   local z = (values.z or 0) + (values.shakeZ or 0) + (values.heightKick or 0)
 
   if camera.fov ~= nil or values.fovKick ~= 0 then
-    camera.fov = (values.fov or entry.baseFov or camera.fov or math.pi / 2) + (values.fovKick or 0)
-    if type(camera.updateProjectionMatrix) == "function" then
-      camera.updateProjectionMatrix()
+    local fov = (values.fov or entry.baseFov or camera.fov or math.pi / 2) + (values.fovKick or 0)
+    camera.fov = fov
+    if entry.appliedFov ~= fov then
+      entry.appliedFov = fov
+      if type(camera.updateProjectionMatrix) == "function" then
+        camera.updateProjectionMatrix()
+      end
     end
   end
 

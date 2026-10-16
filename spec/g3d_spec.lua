@@ -141,6 +141,10 @@ describe("feel.g3d", function()
     assert.are.equal(math.pi / 2 + 0.2, world.camera.fov)
     assert.are.same({ "updateProjectionMatrix" }, calls[1])
     assert.are.same({ "lookAtCamera", 1.25, -8.5, 5.15, 2.1, 3, 4 }, calls[2])
+
+    calls = {}
+    fx:update()
+    assert.are.same({ "lookAtCamera", 1.25, -8.5, 5.15, 2.1, 3, 4 }, calls[1])
   end)
 
   it("handles g3d emit events and delegates unknown events", function()

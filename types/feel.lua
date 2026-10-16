@@ -90,7 +90,9 @@ local feel = {}
 ---@field waiting boolean
 ---@field remaining? number
 ---@field tweens integer
+---@field springs integer
 ---@field children integer
+---@field paused boolean
 
 ---@class FeelAnimateStep
 ---@field kind "animate"
@@ -275,6 +277,12 @@ function feel.clear(target) end
 
 ---@return FeelChannel
 function feel.channel() end
+
+---@param x? number
+---@param stiffness? number
+---@param damping? number
+---@return FeelSpring
+function feel.spring(x, stiffness, damping) end
 
 ---@param ctx? FeelContext
 function feel.stop(ctx) end

@@ -312,3 +312,10 @@ Supported camera events are `camera.shake`, `camera.zoom`, `camera.move`, and `c
 Screen events draw overlays through `fx:drawOverlay()`. Supported screen events are `screen.flash`, `screen.fade`, and `screen.clear`.
 
 Call both `feel.update(dt)` and `fx:update(dt)` from `love.update(dt)`. Adapter update advances camera/screen state and registered particle systems.
+
+## Resetting Adapter State
+
+Call `fx:reset()` when leaving a scene or returning to a known visual baseline. It cancels
+adapter-owned camera, sound, shader, and post-processing animations, clears active screen
+feedback and shader stacking, and restores the adapter defaults. Registered assets remain
+available for the next scene.

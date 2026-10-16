@@ -156,6 +156,14 @@ Feedbacks.define("hit.heavy", {
 Feedbacks.play("hit.heavy", { x = enemy.x, y = enemy.y, z = enemy.z })
 ```
 
+For a faster starting point, `feel.presets` includes editable `hitLight`, `hitHeavy`,
+`cameraPunch`, and `modelImpact` manifests:
+
+```lua
+local presets = require("lib.feel.presets")
+Feedbacks.define("enemy.hit", presets.hitHeavy({ name = "enemy" }))
+```
+
 ## Optional g3d Helpers
 
 `feel.g3d` can bind animated target values to app-owned [g3d](https://github.com/groverburger/g3d) models and cameras:

@@ -115,7 +115,9 @@ local Feel = {}
 ---@field waiting boolean
 ---@field remaining? number
 ---@field tweens integer
+---@field springs integer
 ---@field children integer
+---@field paused boolean
 
 ---@class FeelWaitState
 ---@field remaining number
@@ -387,9 +389,17 @@ end
 ---@param dt number
 ---@return number
 function Spring:update(dt)
-  local a = -self.k * (self.x - self.target) - self.d * self.v
-  self.v = self.v + a * dt
-  self.x = self.x + self.v * dt
+  dt = math.max(0, dt or 0)
+  -- Semi-implicit Euler is stable for normal frame times, but a hitch can make
+  -- a stiff spring explode. Substep large deltas so both raw springs and spring
+  -- sequence steps remain predictable after a slow frame.
+  local steps = math.max(1, math.ceil(dt * 60))
+  local stepDt = dt / steps
+  for _ = 1, steps do
+    local a = -self.k * (self.x - self.target) - self.d * self.v
+    self.v = self.v + a * stepDt
+    self.x = self.x + self.v * stepDt
+  end
   return self.x
 end
 
@@ -821,6 +831,7 @@ local function cancelRunner(runner)
 
   runner.cancelled = true
   runner.wait = nil
+  runner.deferred = nil
 
   for _, active in ipairs(runner.tweens or {}) do
     if active.tween and active.tween.stop then
@@ -848,8 +859,10 @@ local function cancelRunner(runner)
   end
   runner.springs = {}
 
-  for _, child in ipairs(runner.children or {}) do
-    cancelRunner(child)
+  -- Children remove themselves from this array while being cancelled, so walk
+  -- backwards or every other child would be skipped.
+  for index = #(runner.children or {}), 1, -1 do
+    cancelRunner(runner.children[index])
   end
   runner.children = {}
 
@@ -873,15 +886,6 @@ local function collectRunnerTweens(runner, acc)
   return acc
 end
 
--- Set the paused flag on a runner and its whole subtree so pausing a parent
--- freezes its parallel/play/repeat children too.
-local function setSubtreePaused(runner, paused)
-  runner.paused = paused
-  for _, child in ipairs(runner.children or {}) do
-    setSubtreePaused(child, paused)
-  end
-end
-
 -- Move tweens between flux groups, but only those currently parented to `from`.
 -- Note: the vendored flux module returns a wrapper whose dotted remove/add
 -- ignore their first argument, so we must call the group methods directly.
@@ -903,6 +907,27 @@ local function isAncestorPaused(runner)
     parent = parent.parent
   end
   return false
+end
+
+local function isRunnerPaused(runner)
+  return runner.paused == true or isAncestorPaused(runner)
+end
+
+-- Only collect branches that are not independently paused. This preserves a
+-- child's own pause when its parent is paused and later resumed.
+local function collectResumableTweens(runner, acc)
+  if runner.paused then
+    return acc
+  end
+  for _, active in ipairs(runner.tweens or {}) do
+    if active.tween then
+      acc[#acc + 1] = active.tween
+    end
+  end
+  for _, child in ipairs(runner.children or {}) do
+    collectResumableTweens(child, acc)
+  end
+  return acc
 end
 
 -- Finish a spring run: snap each field to its exact rest, decrement the target's
@@ -1216,6 +1241,9 @@ local function runStep(runner, step, nextStep)
     end
 
     for _, child in ipairs(children) do
+      if runner.cancelled then
+        break
+      end
       runSequence(child, childTarget(ctx, step), childOptions(ctx, step), childDone, {
         parent = runner,
         trigger = childTrigger(ctx, step),
@@ -1234,8 +1262,19 @@ local function runStep(runner, step, nextStep)
     end
 
     local played = 0
-    local function playAgain()
+    local burst = 0
+    local playAgain
+    playAgain = function()
       if runner.cancelled then
+        return
+      end
+      -- A forever repeat made only of immediate steps would otherwise recurse
+      -- without ever returning to the game loop. Large finite repeats have the
+      -- same stack-growth problem, so yield after a bounded synchronous burst.
+      burst = burst + 1
+      if burst > 100 then
+        burst = 0
+        runner.deferred = playAgain
         return
       end
       if not step.forever then
@@ -1245,11 +1284,25 @@ local function runStep(runner, step, nextStep)
           return
         end
       end
-      runSequence(sequence, childTarget(ctx, step), childOptions(ctx, step), playAgain, {
+      local synchronous = true
+      local completedSynchronously = false
+      local function childDone()
+        if synchronous then
+          completedSynchronously = true
+          return
+        end
+        burst = 0
+        playAgain()
+      end
+      runSequence(sequence, childTarget(ctx, step), childOptions(ctx, step), childDone, {
         parent = runner,
         trigger = childTrigger(ctx, step),
         source = sequence,
       })
+      synchronous = false
+      if completedSynchronously then
+        playAgain()
+      end
     end
 
     playAgain()
@@ -1461,7 +1514,7 @@ function Feel.update(dt)
     end
     for index = 1, #pending do
       local run = pending[index]
-      if not run.done and not run.runner.cancelled and not run.runner.paused and not isAncestorPaused(run.runner) then
+      if not run.done and not run.runner.cancelled and not isRunnerPaused(run.runner) then
         stepSpringRun(run, dt)
       end
     end
@@ -1469,14 +1522,21 @@ function Feel.update(dt)
 
   for index = #runners, 1, -1 do
     local runner = runners[index]
-    if runner and not runner.paused then
+    if runner and not isRunnerPaused(runner) then
       runner.elapsed = (runner.elapsed or 0) + dt
-      local wait = runner.wait
-      if wait then
-        wait.remaining = wait.remaining - dt
-        if wait.remaining <= 0 then
-          runner.wait = nil
-          wait.nextStep()
+      local deferred = runner.deferred
+      if deferred then
+        runner.deferred = nil
+        deferred()
+      end
+      if not runner.cancelled then
+        local wait = runner.wait
+        if wait then
+          wait.remaining = wait.remaining - dt
+          if wait.remaining <= 0 then
+            runner.wait = nil
+            wait.nextStep()
+          end
         end
       end
     end
@@ -1503,7 +1563,9 @@ function Feel.active()
         waiting = wait ~= nil,
         remaining = wait and wait.remaining or nil,
         tweens = #(runner.tweens or {}),
+        springs = #(runner.springs or {}),
         children = #(runner.children or {}),
+        paused = isRunnerPaused(runner),
       }
     end
   end
@@ -1537,11 +1599,21 @@ local function clearTarget(target)
     targets[target] = nil
   end
 
-  for index = #runners, 1, -1 do
-    local runner = runners[index]
+  -- A child runner is part of its parent's completion accounting. Cancelling
+  -- only that child would strand the parent forever, so clear the owning root
+  -- whenever this target appears anywhere in a run tree.
+  local roots = {}
+  for _, runner in ipairs(runners) do
     if runner and runner.ctx and runner.ctx.target == target then
-      cancelRunner(runner)
+      local root = runner
+      while root.parent do
+        root = root.parent
+      end
+      roots[root] = true
     end
+  end
+  for root in pairs(roots) do
+    cancelRunner(root)
   end
   restartTargets[target] = nil
 end
@@ -1609,7 +1681,7 @@ function Feel.pause(ctx)
   if not runner or runner.cancelled or runner.paused then
     return
   end
-  setSubtreePaused(runner, true)
+  runner.paused = true
   moveTweens(collectRunnerTweens(runner, {}), group, pausedGroup)
 end
 
@@ -1620,12 +1692,12 @@ function Feel.resume(ctx)
   if not runner or runner.cancelled or not runner.paused then
     return
   end
-  setSubtreePaused(runner, false)
+  runner.paused = false
   if isAncestorPaused(runner) then
-    -- A paused ancestor still owns the parked tweens; they un-park with it.
+    -- A paused ancestor still owns the parked tweens and effective pause state.
     return
   end
-  moveTweens(collectRunnerTweens(runner, {}), pausedGroup, group)
+  moveTweens(collectResumableTweens(runner, {}), pausedGroup, group)
 end
 
 -- Freeze every run globally (feel.update advances nothing until resumeAll()).
@@ -1681,7 +1753,7 @@ end
 ---@return boolean
 function FeelContext:isPaused()
   local runner = self.runner
-  return runner ~= nil and runner.paused == true and not runner.cancelled
+  return runner ~= nil and not runner.cancelled and isRunnerPaused(runner)
 end
 
 ---@return boolean

@@ -62,7 +62,33 @@ end
 | `Feedbacks.timeScale()` | Return the explicit feedback time scale. |
 | `Feedbacks.timeTarget()` | Return the internal time target. |
 
-`opts` accepts normal `feel.play` options such as `restart`, `key`, `trigger`, `emit`, `audio`, `log`, and `markDirty`. It also accepts `target` for manifests that include normal `animate` steps.
+`opts` accepts normal `feel.play` options such as `restart`, `key`, `trigger`, `emit`, `audio`, `log`, and `markDirty`. It also accepts `target` for manifests that include normal `animate` or `spring` steps.
+
+Core steps—including nested named `play` steps—are compiled as normal recipes. This lets a
+feedback manifest animate a target directly alongside adapter shorthand:
+
+```lua
+Feedbacks.define("button.release", {
+  { kind = "spring", to = { scale = 1 }, stiffness = 180, damping = 18 },
+})
+
+Feedbacks.play("button.release", { target = button })
+```
+
+## Presets
+
+`feel.presets` provides small starting manifests for common impact feedback. They are plain
+tables, so you can pass them directly to `Feedbacks.play`, store them with `define`, or edit
+the returned recipe.
+
+```lua
+local presets = require("feel.presets")
+
+Feedbacks.define("enemy.hit", presets.hitHeavy({ name = "enemy", shake = 0.1 }))
+Feedbacks.play("enemy.hit", { name = "enemy" })
+```
+
+Available factories are `hitLight`, `hitHeavy`, `cameraPunch`, and `modelImpact`.
 
 ## Shorthand Steps
 
