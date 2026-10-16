@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v1.4.1 - 2026-10-16
+
+- Added a separate `feel-haptics-<version>.zip` release artifact for installing the dependency-free haptics engine without the core Feel runner.
+
 ## v1.4.0 - 2026-10-16
 
 All changes are backward compatible. The new haptics and sprite modules are optional and do

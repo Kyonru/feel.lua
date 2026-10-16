@@ -31,6 +31,9 @@ Feather installs the package under `lib/feel`:
 local feel = require("lib.feel")
 ```
 
+Each [GitHub release](https://github.com/Kyonru/feel.lua/releases) also includes a compact
+`feel-haptics-<version>.zip` for using only the dependency-free haptic pattern engine.
+
 ## Quick Start
 
 ```lua

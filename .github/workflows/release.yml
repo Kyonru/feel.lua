@@ -27,8 +27,11 @@ jobs:
             safe_tag="${GITHUB_SHA::12}"
           fi
           package_name="feel.lua-${safe_tag}"
+          haptics_package_name="feel-haptics-${safe_tag}"
           staging_dir="dist/${package_name}"
+          haptics_staging_dir="dist/${haptics_package_name}"
           archive_path="dist/${package_name}.zip"
+          haptics_archive_path="dist/${haptics_package_name}.zip"
 
           mkdir -p "$staging_dir"
           cp feel.lua "$staging_dir/feel.lua"
@@ -65,15 +68,31 @@ jobs:
           test -f "$staging_dir/types/feel-menori.lua"
           test -f "$staging_dir/types/feel-presets.lua"
 
+          mkdir -p "$haptics_staging_dir/feel" "$haptics_staging_dir/types"
+          cp feel/haptics.lua "$haptics_staging_dir/feel/haptics.lua"
+          cp types/feel-haptics.lua "$haptics_staging_dir/types/feel-haptics.lua"
+          cp packaging/haptics/README.md "$haptics_staging_dir/README.md"
+          cp LICENSE CHANGELOG.md .luarc.json "$haptics_staging_dir/"
+
+          test -f "$haptics_staging_dir/feel/haptics.lua"
+          test -f "$haptics_staging_dir/types/feel-haptics.lua"
+          test -f "$haptics_staging_dir/README.md"
+          test -f "$haptics_staging_dir/LICENSE"
+
           (cd dist && zip -r -q "${package_name}.zip" "$package_name")
+          (cd dist && zip -r -q "${haptics_package_name}.zip" "$haptics_package_name")
           unzip -l "$archive_path"
+          unzip -l "$haptics_archive_path"
 
           echo "archive_path=${archive_path}" >> "$GITHUB_OUTPUT"
+          echo "haptics_archive_path=${haptics_archive_path}" >> "$GITHUB_OUTPUT"
 
       - name: Upload archive to GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          files: ${{ steps.package.outputs.archive_path }}
+          files: |
+            ${{ steps.package.outputs.archive_path }}
+            ${{ steps.package.outputs.haptics_archive_path }}
           fail_on_unmatched_files: true
           overwrite_files: true
           generate_release_notes: true

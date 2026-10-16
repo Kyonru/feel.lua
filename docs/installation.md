@@ -36,6 +36,19 @@ local feelSprite = require("feel.sprite")
 
 The root `feel.lua` file is a small loader shim. The implementation lives in `feel/init.lua`, and `feel/vendor/flux.lua` is bundled.
 
+### Haptics Only
+
+Every GitHub release also provides a smaller `feel-haptics-<version>.zip` archive. Extract
+its `feel/` directory into your project when you only need the dependency-free haptic engine:
+
+```lua
+local feelHaptics = require("feel.haptics")
+local haptics = feelHaptics.new(driver)
+```
+
+The standalone archive also includes its LuaLS definition, focused README, changelog, and
+license. It does not include or load the core Feel runner.
+
 Create the LOVE adapter only when you need registered side effects:
 
 ```lua
