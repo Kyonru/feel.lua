@@ -2,9 +2,15 @@
 
 ## Unreleased
 
+## v1.4.0 - 2026-10-16
+
+All changes are backward compatible. The new haptics and sprite modules are optional and do
+not add dependencies to the core runner.
+
 - Added renderer-independent `feel.sprite` effects with composable poses, draw callbacks, reusable reactions for hits, landing, recoil, wobble, blinking, spawning, despawning, and charging, plus an optional dependency-free `feel.sprite.anim8` draw adapter.
 - Added a standalone, core-independent `feel.haptics` module with its own update clock, a hardware-independent driver API, an expanded expressive preset catalog, reusable timed pulse patterns, a Pulsar-inspired timeline composer with continuous/pulse/curve segments and overlap resolution, playback handles, defensive pattern discovery, master intensity and enable controls, per-target restart/cancellation, generated-pulse safety limits, and editor type definitions. The LOVE adapter now delegates its haptic API to this engine and adds safe device replacement/removal and reset-time vibration cleanup.
 - Added a practical Recipes guide with copyable UI, combat, pickup, loop, transition, channel, and preset patterns.
+- Consolidated the documentation gallery into focused motion, combo, host-integration, impact, haptics, sprite, g3d, and Menori examples using compact captures and attributed Kenney assets.
 - Fixed cancellation of parallel runs so stopping or restarting a parent reliably cancels every child branch, and target-specific clear now cancels the owning run tree instead of stranding its parent.
 - Made nested pause state compositional: children remain effectively paused while an ancestor is paused, and independently paused branches stay paused when a parent resumes.
 - Stabilized raw and sequenced springs across large frame deltas by internally substepping integration.
