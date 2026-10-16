@@ -13,6 +13,7 @@
 - Routes gameplay intents to feedback with lightweight `feel.channel()` pub/sub.
 - Optionally groups adapter events into named feedback stacks with `feel.feedbacks`.
 - Composes reusable haptic patterns and presets through the hardware-independent `feel.haptics` module.
+- Layers renderer-independent sprite recoil, squash, flash, and draw-time transforms over plain LOVE or Anim8 rendering.
 
 https://github.com/user-attachments/assets/6b15a87f-5a11-42f6-922b-ccf8bd0627f7
 
@@ -193,6 +194,25 @@ end
 The LOVE adapter supplies this driver automatically as `fx.hapticEngine`. Standalone users
 can require only this module—or copy `feel/haptics.lua` as `haptics.lua`—and advance it with
 `haptics:update(dt)`.
+
+## Sprite Effects
+
+`feel.sprite` composes temporary effects with an app-owned sprite pose, without controlling
+frames or requiring a rendering library:
+
+```lua
+local Sprite = require("lib.feel.sprite")
+local spriteFx = Sprite.target()
+
+Sprite.play(spriteFx, "hitHeavy", { x = -10 })
+
+Sprite.draw(spriteFx, { x = player.x, y = player.y }, function(pose)
+  love.graphics.draw(image, pose.x, pose.y, pose.rotation, pose.scaleX, pose.scaleY)
+end)
+```
+
+An optional `lib.feel.sprite.anim8` helper translates the same pose into Anim8 draw arguments
+without importing or taking ownership of Anim8.
 
 ## Optional g3d Helpers
 

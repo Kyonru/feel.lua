@@ -58,6 +58,7 @@ nav = [
     { "Sequence Steps" = "sequence-steps.md" },
     { "Feedback Authoring" = "feedbacks.md" },
     { "Haptics" = "haptics.md" },
+    { "Sprite Effects" = "sprite.md" },
     { "Autocomplete" = "autocomplete.md" },
     { "Writing a Custom Adapter" = "custom-adapter.md" },
     { "Best Practices" = "best-practices.md" },
