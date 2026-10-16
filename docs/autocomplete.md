@@ -12,12 +12,14 @@ local feelLove = require("feel.love")
 local feelG3d = require("feel.g3d")
 local feelMenori = require("feel.menori")
 local feelFeedbacks = require("feel.feedbacks")
+local feelHaptics = require("feel.haptics")
 
 local target = feel.target({ values = { scale = 1, teleportGlow = 0 } })
 local fx = feelLove.new()
 local g3dfx = feelG3d.new(g3d)
 local menorifx = feelMenori.new(menori)
 local Feedbacks = feelFeedbacks.new({ love = fx, g3d = g3dfx, menori = menorifx })
+local haptics = feelHaptics.new(driver)
 ```
 
 ## What Should Complete
@@ -28,6 +30,7 @@ local Feedbacks = feelFeedbacks.new({ love = fx, g3d = g3dfx, menori = menorifx 
 - Optional g3d helper methods on `g3dfx`, including `model`, `camera`, `update`, `emit`, and `handlers`.
 - Optional Menori helper methods on `menorifx`, including `node`, `model`, `camera`, `animation`, `uniform`, `update`, `emit`, and `handlers`.
 - Feedback authoring helpers on `Feedbacks`, including `define`, `play`, `clear`, `timeScale`, and `timeTarget`.
+- Haptic engine methods on `haptics`, including `define`, `play`, `trigger`, `stopTarget`, `setScale`, and `setEnabled`.
 - Common adapter event payloads such as `post.tween`, `screen.flash`, `camera.shake`, `particle.emit`, and `sound.volume`.
 - g3d feedback event names such as `g3d.camera.shake`, `g3d.camera.fov`, and `g3d.model.scalePunch`.
 - Menori feedback event names such as `menori.camera.shake`, `menori.node.scalePunch`, and `menori.uniform.pulse`.

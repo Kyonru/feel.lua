@@ -12,6 +12,7 @@
 - Controls individual runs (stop, pause, resume, completion signals) and the whole clock (global pause, time scale).
 - Routes gameplay intents to feedback with lightweight `feel.channel()` pub/sub.
 - Optionally groups adapter events into named feedback stacks with `feel.feedbacks`.
+- Composes reusable haptic patterns and presets through the hardware-independent `feel.haptics` module.
 
 https://github.com/user-attachments/assets/6b15a87f-5a11-42f6-922b-ccf8bd0627f7
 
@@ -163,6 +164,34 @@ For a faster starting point, `feel.presets` includes editable `hitLight`, `hitHe
 local presets = require("lib.feel.presets")
 Feedbacks.define("enemy.hit", presets.hitHeavy({ name = "enemy" }))
 ```
+
+## Haptic Patterns
+
+`feel.haptics` provides reusable pulse patterns, built-in semantic presets, intensity
+settings, and cancellation without depending on LOVE or the Feel runner:
+
+```lua
+local haptics = require("lib.feel.haptics").new({
+  play = function(pulse)
+    platform.rumble(pulse.left, pulse.right, pulse.duration)
+    return true
+  end,
+  stop = function()
+    platform.stopRumble()
+    return true
+  end,
+})
+
+haptics:play("success")
+
+function update(dt)
+  haptics:update(dt)
+end
+```
+
+The LOVE adapter supplies this driver automatically as `fx.hapticEngine`. Standalone users
+can require only this module—or copy `feel/haptics.lua` as `haptics.lua`—and advance it with
+`haptics:update(dt)`.
 
 ## Optional g3d Helpers
 

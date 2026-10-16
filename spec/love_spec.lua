@@ -356,6 +356,106 @@ describe("feel.love", function()
     assert.are.equal(1, #calls)
   end)
 
+  it("applies a master haptic intensity scale", function()
+    local fx = feelLove.new({ hapticScale = 0.5 })
+    fx:haptic("p1", joystick("p1"))
+    calls = {}
+
+    fx:emit({ kind = "haptic.play", payload = { name = "p1", left = 0.8, right = 0.4, system = false } })
+
+    assert.are.same({ "setVibration", "p1", 0.4, 0.2, 0.12 }, calls[1])
+    assert.are.equal(0.25, fx:setHapticScale(0.25))
+    assert.are.equal(0.25, fx:hapticScale())
+  end)
+
+  it("can disable haptics and immediately stop active output", function()
+    local fx = feelLove.new()
+    fx:haptic("p1", joystick("p1"))
+    calls = {}
+    fx:emit({ kind = "haptic.play", payload = { name = "p1", value = 0.8 } })
+
+    assert.is_false(fx:setHapticsEnabled(false))
+    local stoppedAt = #calls
+    assert.is_false(fx:emit({ kind = "haptic.play", payload = { name = "p1", value = 1 } }))
+    assert.are.equal(stoppedAt, #calls)
+    assert.is_false(fx:hapticsEnabled())
+    assert.is_true(fx:setHapticsEnabled(true))
+  end)
+
+  it("stops old devices when haptic targets are replaced or removed", function()
+    local fx = feelLove.new()
+    fx:haptic("p1", joystick("old"))
+    calls = {}
+
+    fx:haptic("p1", joystick("new"))
+    assert.are.same({ "setVibration", "old", nil, nil, nil }, calls[1])
+    assert.is_true(fx:removeHaptic("p1"))
+    assert.are.same({ "setVibration", "new", nil, nil, nil }, calls[2])
+    assert.is_false(fx:removeHaptic("missing"))
+  end)
+
+  it("plays reusable haptic pulse patterns through the feel clock", function()
+    local fx = feelLove.new()
+    fx:haptic("p1", joystick("p1"))
+    fx:hapticPattern("double", {
+      { value = 0.25, duration = 0.05, gap = 0.02 },
+      { left = 1, right = 0.4, duration = 0.1 },
+    })
+    calls = {}
+
+    assert.is_true(fx:emit({
+      kind = "haptic.pattern",
+      payload = { pattern = "double", name = "p1", system = false },
+    }))
+    assert.are.same({ "setVibration", "p1", 0.25, 0.25, 0.05 }, calls[1])
+
+    fx:update(0.06)
+    assert.are.equal(1, countCalls("setVibration"))
+    fx:update(0.011)
+    assert.are.same({ "setVibration", "p1", 1, 0.4, 0.1 }, calls[2])
+    fx:update(0.1)
+    assert.is_nil(next(fx.hapticEngine.runs))
+  end)
+
+  it("stops a named haptic pattern before later pulses", function()
+    local fx = feelLove.new()
+    fx:haptic("p1", joystick("p1"))
+    fx:hapticPattern("alarm", {
+      { value = 0.3, duration = 0.1 },
+      { value = 0.9, duration = 0.1 },
+    })
+    calls = {}
+
+    fx:playHapticPattern("alarm", { name = "p1", system = false })
+    assert.is_true(fx:emit({
+      kind = "haptic.stop",
+      payload = { pattern = "alarm", name = "p1", system = false },
+    }))
+    fx:update(1)
+
+    assert.are.equal(2, countCalls("setVibration"))
+    assert.are.same({ "setVibration", "p1", nil, nil, nil }, calls[2])
+  end)
+
+  it("reset cancels haptic patterns and stops controller and system output", function()
+    local fx = feelLove.new()
+    fx:haptic("p1", joystick("p1"))
+    fx:hapticPattern("long", {
+      { value = 0.4, duration = 0.2 },
+      { value = 0.9, duration = 0.2 },
+    })
+    calls = {}
+
+    fx:playHapticPattern("long", { name = "p1" })
+    fx:reset()
+    fx:update(1)
+
+    assert.are.equal(2, countCalls("setVibration"))
+    assert.are.same({ "setVibration", "p1", nil, nil, nil }, calls[#calls - 1])
+    assert.are.same({ "vibrate", 0 }, calls[#calls])
+    assert.is_nil(next(fx.hapticEngine.runs))
+  end)
+
   it("ignores unsupported haptic joysticks", function()
     local fx = feelLove.new()
 

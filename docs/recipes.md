@@ -231,6 +231,25 @@ Feedbacks.play("enemy.hit-heavy", { name = "enemy" })
 Available factories are `hitLight`, `hitHeavy`, `cameraPunch`, and `modelImpact`. Their
 results are ordinary manifest tables, so copy or extend them when the effect needs to grow.
 
+## Heartbeat Haptic Pattern
+
+The standalone haptics module includes a `heartbeat` preset. The LOVE adapter advances it
+from `fx:update(dt)`:
+
+```lua
+feel.define("player.heartbeat", {
+  {
+    kind = "emit",
+    event = "haptic.pattern",
+    payload = { pattern = "heartbeat", name = "p1", system = false },
+  },
+})
+```
+
+Use `fx:setHapticScale(playerSettings.haptics)` for controller intensity preferences and
+`fx:setHapticsEnabled(false)` to stop and suppress haptics entirely. Define a custom pattern
+with `fx.hapticEngine:define(name, pulses)` when the built-in rhythm does not fit.
+
 ## Cleanup Checklist
 
 - Use `restart = true` and a stable `key` for effects that can be triggered rapidly.

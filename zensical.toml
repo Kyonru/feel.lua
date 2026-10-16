@@ -57,6 +57,7 @@ nav = [
     { "Core Runner" = "core-runner.md" },
     { "Sequence Steps" = "sequence-steps.md" },
     { "Feedback Authoring" = "feedbacks.md" },
+    { "Haptics" = "haptics.md" },
     { "Autocomplete" = "autocomplete.md" },
     { "Writing a Custom Adapter" = "custom-adapter.md" },
     { "Best Practices" = "best-practices.md" },

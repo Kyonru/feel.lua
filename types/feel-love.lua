@@ -14,6 +14,7 @@ local feelLove = {}
 ---@field fade table
 ---@field soundEntries table<string, FeelLoveSoundEntry>
 ---@field hapticEntries table<string, FeelLoveHapticEntry>
+---@field hapticEngine FeelHaptics
 ---@field particleEntries table<string, FeelLoveParticleEntry>
 ---@field particleOrder string[]
 ---@field shaderEntries table<string, FeelLoveShaderEntry>
@@ -37,6 +38,8 @@ local feelLove = {}
 ---@field fadeAmount? number
 ---@field fadeDuration? number
 ---@field hapticDuration? number
+---@field hapticScale? number
+---@field hapticsEnabled? boolean
 
 ---@class FeelLoveDefaults
 ---@field x number
@@ -79,6 +82,20 @@ local feelLove = {}
 
 ---@class FeelLoveHapticOptions
 ---@field duration? number
+
+---@class FeelLoveHapticPulse
+---@field value? number
+---@field intensity? number Alias for value.
+---@field left? number
+---@field right? number
+---@field duration? number
+---@field gap? number
+---@field system? boolean
+
+---@class FeelLoveHapticPatternOptions
+---@field name? string Haptic target name.
+---@field target? string Haptic target name; alias for name.
+---@field system? boolean
 
 ---@class FeelLoveHapticEntry
 ---@field name string
@@ -123,7 +140,7 @@ local feelLove = {}
 
 ---@alias FeelLovePostEffectName '"bloom"'|'"chromatic"'|'"grade"'|'"lens"'|'"vignette"'|'"volume"'
 ---@alias FeelLoveSoundEventName '"sound.play"'|'"sound.stop"'|'"sound.pause"'|'"sound.resume"'|'"sound.volume"'|'"sound.pitch"'|'"sound.pan"'
----@alias FeelLoveHapticEventName '"haptic.play"'|'"haptic.stop"'|'"haptic.vibrate"'
+---@alias FeelLoveHapticEventName '"haptic.play"'|'"haptic.pattern"'|'"haptic.stop"'|'"haptic.vibrate"'
 ---@alias FeelLoveParticleEventName '"particle.emit"'|'"particle.start"'|'"particle.stop"'|'"particle.reset"'|'"particle.move"'
 ---@alias FeelLoveShaderEventName '"shader.send"'|'"shader.tween"'|'"shader.apply"'|'"shader.clear"'
 ---@alias FeelLovePostEventName '"post.set"'|'"post.tween"'|'"post.enable"'|'"post.disable"'|'"post.weight"'|'"post.clear"'
@@ -179,6 +196,7 @@ local feelLove = {}
 ---@field right? number
 ---@field duration? number
 ---@field system? boolean
+---@field pattern? string
 
 ---@class FeelLoveParticlePayload
 ---@field name? string
@@ -268,6 +286,44 @@ function FeelLoveAdapter:stopSounds() end
 ---@param opts? FeelLoveHapticOptions
 ---@return FeelLoveAdapter
 function FeelLoveAdapter:haptic(name, joystickOrJoysticks, opts) end
+
+---@param name string
+---@return boolean
+function FeelLoveAdapter:removeHaptic(name) end
+
+---@param name string
+---@param pulses FeelLoveHapticPulse[]
+---@return FeelLoveAdapter
+function FeelLoveAdapter:hapticPattern(name, pulses) end
+
+---@param patterns? table<string, FeelLoveHapticPulse[]>
+---@return FeelLoveAdapter
+function FeelLoveAdapter:hapticPatterns(patterns) end
+
+---@param name string
+---@param opts? FeelLoveHapticPatternOptions
+---@return FeelHapticRun|false
+function FeelLoveAdapter:playHapticPattern(name, opts) end
+
+---@param name string
+---@param target? string
+---@param system? boolean
+---@return boolean
+function FeelLoveAdapter:stopHapticPattern(name, target, system) end
+
+---@param enabled? boolean
+---@return boolean
+function FeelLoveAdapter:setHapticsEnabled(enabled) end
+
+---@return boolean
+function FeelLoveAdapter:hapticsEnabled() end
+
+---@param scale number
+---@return number
+function FeelLoveAdapter:setHapticScale(scale) end
+
+---@return number
+function FeelLoveAdapter:hapticScale() end
 
 ---@param map? table<string, FeelLoveJoystickLike|FeelLoveJoystickLike[]>
 ---@return FeelLoveAdapter

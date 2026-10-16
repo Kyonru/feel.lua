@@ -34,6 +34,7 @@ Use it when an action should read better: a button press, player hit, reward rev
 | [Sequence Steps](sequence-steps.md)   | `animate`, `emit`, `audio`, `wait`, `play`, `parallel`, `repeat`, `random`, `callback`, and `log`.                                |
 | [API](api.md)                         | Compact function signatures, options, and exported helpers.                                                                       |
 | [Autocomplete](autocomplete.md)       | LuaLS setup, local definition files, LOVE2D types, and custom target values.                                                      |
+| [Haptics](haptics.md)                 | Reusable pulse patterns, built-in semantic presets, intensity settings, cancellation, and custom hardware drivers.               |
 | [LOVE Adapter](love-adapter.md)       | Registered sound cues, haptics, particle systems, shaders, post-processing, camera events, screen overlays, and adapter handlers. |
 | [Post Processing](post-processing.md) | Built-in LOVE canvas effects, parameters, and recipes.                                                                            |
 | [g3d Helpers](g3d.md)                 | Optional helpers for binding `feel.target` values to groverburger/g3d models and cameras.                                         |

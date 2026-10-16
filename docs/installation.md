@@ -19,6 +19,7 @@ Feather installs the package under `lib/feel`, so require it with:
 ```lua
 local feel = require("lib.feel")
 local feelLove = require("lib.feel.love")
+local feelHaptics = require("lib.feel.haptics")
 ```
 
 ## Option 2: Manual Copy
@@ -28,6 +29,7 @@ Copy `feel.lua` and the `feel/` directory into your project, then require it:
 ```lua
 local feel = require("feel")
 local feelLove = require("feel.love")
+local feelHaptics = require("feel.haptics")
 ```
 
 The root `feel.lua` file is a small loader shim. The implementation lives in `feel/init.lua`, and `feel/vendor/flux.lua` is bundled.

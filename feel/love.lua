@@ -6,6 +6,7 @@ end
 
 ---@type FeelModule
 local feel = require(prefix)
+local Haptics = require(prefix .. ".haptics")
 
 ---@module "feel.love"
 
@@ -24,6 +25,7 @@ local FeelLove = {}
 ---@field fade table
 ---@field soundEntries table<string, FeelLoveSoundEntry>
 ---@field hapticEntries table<string, FeelLoveHapticEntry>
+---@field hapticEngine FeelHaptics
 ---@field particleEntries table<string, FeelLoveParticleEntry>
 ---@field particleOrder string[]
 ---@field shaderEntries table<string, FeelLoveShaderEntry>
@@ -49,6 +51,8 @@ Adapter.__index = Adapter
 ---@field fadeAmount? number
 ---@field fadeDuration? number
 ---@field hapticDuration? number
+---@field hapticScale? number
+---@field hapticsEnabled? boolean
 
 ---@class FeelLoveDefaults
 ---@field x number
@@ -91,6 +95,20 @@ Adapter.__index = Adapter
 
 ---@class FeelLoveHapticOptions
 ---@field duration? number
+
+---@class FeelLoveHapticPulse
+---@field value? number
+---@field intensity? number Alias for value.
+---@field left? number
+---@field right? number
+---@field duration? number
+---@field gap? number
+---@field system? boolean
+
+---@class FeelLoveHapticPatternOptions
+---@field name? string Haptic target name.
+---@field target? string Haptic target name; alias for name.
+---@field system? boolean
 
 ---@class FeelLoveHapticEntry
 ---@field name string
@@ -142,7 +160,7 @@ Adapter.__index = Adapter
 ---| '"sound.volume"'
 ---| '"sound.pitch"'
 ---| '"sound.pan"'
----@alias FeelLoveHapticEventName '"haptic.play"'|'"haptic.stop"'|'"haptic.vibrate"'
+---@alias FeelLoveHapticEventName '"haptic.play"'|'"haptic.pattern"'|'"haptic.stop"'|'"haptic.vibrate"'
 ---@alias FeelLoveParticleEventName
 ---| '"particle.emit"'
 ---| '"particle.start"'
@@ -214,6 +232,7 @@ Adapter.__index = Adapter
 ---@field right? number
 ---@field duration? number
 ---@field system? boolean
+---@field pattern? string
 
 ---@class FeelLoveParticlePayload
 ---@field name? string
@@ -604,8 +623,9 @@ local function resumeSources(entry)
 end
 
 local function clamp01(value, fallback)
+  value = tonumber(value)
   if value == nil then
-    value = fallback or 0
+    value = tonumber(fallback) or 0
   end
   if value < 0 then
     return 0
@@ -645,7 +665,7 @@ local function playHapticEntry(entry, payload, defaultDuration)
   local value = payload.value ~= nil and payload.value or 1
   local left = clamp01(payload.left, value)
   local right = clamp01(payload.right, value)
-  local duration = payload.duration or entry.duration or defaultDuration
+  local duration = tonumber(payload.duration) or tonumber(entry.duration) or defaultDuration
   local played = false
 
   for _, joystick in ipairs(entry.joysticks) do
@@ -1026,6 +1046,7 @@ end
 
 ---@return nil
 function Adapter:reset()
+  self.hapticEngine:stopAll()
   feel.clear(self.cameraTarget)
   for _, entry in pairs(self.soundEntries) do
     feel.clear(entry.target)
@@ -1123,12 +1144,80 @@ function Adapter:haptic(name, joystickOrJoysticks, opts)
   end
 
   opts = opts or {}
+  if self.hapticEntries[name] then
+    self:stopHaptic(name)
+  end
   self.hapticEntries[name] = {
     name = name,
     joysticks = collectJoysticks(joystickOrJoysticks),
     duration = opts.duration,
   }
   return self
+end
+
+---@param name string
+---@return boolean
+function Adapter:removeHaptic(name)
+  if not self.hapticEntries[name] then
+    return false
+  end
+  self:stopHaptic(name)
+  self.hapticEntries[name] = nil
+  return true
+end
+
+---@param name string
+---@param pulses FeelLoveHapticPulse[]
+---@return FeelLoveAdapter
+function Adapter:hapticPattern(name, pulses)
+  self.hapticEngine:define(name, pulses)
+  return self
+end
+
+---@param patterns? table<string, FeelLoveHapticPulse[]>
+---@return FeelLoveAdapter
+function Adapter:hapticPatterns(patterns)
+  for name, pulses in pairs(patterns or {}) do
+    self:hapticPattern(name, pulses)
+  end
+  return self
+end
+
+---@param name string
+---@param opts? FeelLoveHapticPatternOptions
+---@return FeelHapticRun|false
+function Adapter:playHapticPattern(name, opts)
+  return self.hapticEngine:play(name, opts)
+end
+
+---@param name string
+---@param target? string
+---@param system? boolean
+---@return boolean
+function Adapter:stopHapticPattern(name, target, system)
+  return self.hapticEngine:stop(name, target, { system = system })
+end
+
+---@param enabled? boolean
+---@return boolean
+function Adapter:setHapticsEnabled(enabled)
+  return self.hapticEngine:setEnabled(enabled)
+end
+
+---@return boolean
+function Adapter:hapticsEnabled()
+  return self.hapticEngine:isEnabled()
+end
+
+---@param scale number
+---@return number
+function Adapter:setHapticScale(scale)
+  return self.hapticEngine:setScale(scale)
+end
+
+---@return number
+function Adapter:hapticScale()
+  return self.hapticEngine:scale()
 end
 
 ---@param map? table<string, FeelLoveJoystickLike|FeelLoveJoystickLike[]>
@@ -1143,21 +1232,27 @@ end
 ---@param name string
 ---@return boolean
 function Adapter:stopHaptic(name)
-  return stopHapticEntry(self.hapticEntries[name])
+  return self.hapticEngine:stopTarget(name, { system = false })
 end
 
 ---@return boolean
 function Adapter:stopHaptics()
-  for _, entry in pairs(self.hapticEntries) do
-    stopHapticEntry(entry)
-  end
+  self.hapticEngine:stopAll({ system = false })
   return true
 end
 
 ---@param duration? number
 ---@return boolean
 function Adapter:vibrate(duration)
-  return vibrateSystem(duration)
+  if not self.hapticEngine:isEnabled() or self.hapticEngine:scale() <= 0 then
+    return false
+  end
+  duration = math.max(0, tonumber(duration) or self.defaults.hapticDuration)
+  local vibrated = vibrateSystem(duration)
+  if vibrated then
+    self._systemHapticActive = duration > 0
+  end
+  return vibrated
 end
 
 ---@param name string
@@ -1320,6 +1415,8 @@ end
 function Adapter:update(dt)
   dt = dt or 0
 
+  self.hapticEngine:update(dt)
+
   for _, name in ipairs(self.particleOrder) do
     local entry = self.particleEntries[name]
     callSource(entry and entry.system, "update", dt)
@@ -1447,36 +1544,24 @@ function Adapter:emit(event, ctx)
   elseif kind == "sound.pan" then
     return setSoundValue(self.soundEntries[payload.cue], "pan", payload.pan, payload.duration, payload.ease, payload.restart)
   elseif kind == "haptic.play" then
-    local played = false
-    local systemDuration = payload.duration or self.defaults.hapticDuration
-    if payload.name then
-      local entry = self.hapticEntries[payload.name]
-      if entry then
-        systemDuration = payload.duration or entry.duration or self.defaults.hapticDuration
-      end
-      played = playHapticEntry(entry, payload, self.defaults.hapticDuration)
-    else
-      for _, entry in pairs(self.hapticEntries) do
-        played = playHapticEntry(entry, payload, self.defaults.hapticDuration) or played
-      end
-    end
-    if payload.system ~= false then
-      played = vibrateSystem(systemDuration) or played
-    end
-    return played
+    return self.hapticEngine:trigger(payload)
+  elseif kind == "haptic.pattern" then
+    return self:playHapticPattern(payload.pattern, payload) ~= false
   elseif kind == "haptic.stop" then
     local stopped
-    if payload.name then
+    if payload.pattern then
+      stopped = self:stopHapticPattern(payload.pattern, payload.name or payload.target, payload.system)
+    elseif payload.name then
       stopped = self:stopHaptic(payload.name)
     else
       stopped = self:stopHaptics()
     end
-    if payload.system ~= false then
-      stopped = vibrateSystem(0) or stopped
+    if payload.system ~= false and not payload.pattern then
+      stopped = self:vibrate(0) or stopped
     end
     return stopped
   elseif kind == "haptic.vibrate" then
-    return vibrateSystem(payload.duration)
+    return self:vibrate(payload.duration)
   elseif kind == "particle.emit" then
     return emitParticle(particleEntry(self, payload), payload)
   elseif kind == "particle.start" then
@@ -1691,7 +1776,6 @@ function FeelLove.new(opts)
       rotation = opts.rotation or 0,
     },
   })
-
   local adapter = setmetatable({
     opts = opts,
     cameraTarget = cameraTarget,
@@ -1716,12 +1800,62 @@ function FeelLove.new(opts)
     fade = {},
     soundEntries = {},
     hapticEntries = {},
+    _systemHapticActive = false,
     particleEntries = {},
     particleOrder = {},
     shaderEntries = {},
     shaderStack = {},
     post = newPostState(),
   }, Adapter)
+
+  adapter.hapticEngine = Haptics.new({
+    play = function(payload, driverContext)
+      local played = false
+      local targetName = payload.target or payload.name
+      local systemDuration = payload.duration or adapter.defaults.hapticDuration
+      if targetName then
+        local entry = adapter.hapticEntries[targetName]
+        if entry and not driverContext.durationExplicit then
+          systemDuration = entry.duration or adapter.defaults.hapticDuration
+          payload.duration = systemDuration
+        end
+        played = playHapticEntry(entry, payload, adapter.defaults.hapticDuration)
+      else
+        for _, entry in pairs(adapter.hapticEntries) do
+          played = playHapticEntry(entry, payload, adapter.defaults.hapticDuration) or played
+        end
+      end
+      if payload.system ~= false then
+        local vibrated = vibrateSystem(systemDuration)
+        if vibrated then
+          adapter._systemHapticActive = systemDuration > 0
+        end
+        played = vibrated or played
+      end
+      return played
+    end,
+    stop = function(stopOpts)
+      stopOpts = stopOpts or {}
+      local stopped = false
+      local targetName = stopOpts.target or stopOpts.name
+      if targetName then
+        stopped = stopHapticEntry(adapter.hapticEntries[targetName])
+      else
+        for _, entry in pairs(adapter.hapticEntries) do
+          stopped = stopHapticEntry(entry) or stopped
+        end
+      end
+      if stopOpts.system ~= false and adapter._systemHapticActive then
+        stopped = vibrateSystem(0) or stopped
+        adapter._systemHapticActive = false
+      end
+      return stopped
+    end,
+  }, {
+    duration = adapter.defaults.hapticDuration,
+    enabled = opts.hapticsEnabled,
+    scale = opts.hapticScale,
+  })
 
   adapter:reset()
   return adapter

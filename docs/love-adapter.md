@@ -36,7 +36,7 @@ Unknown cues and events are no-ops for the adapter, so user callbacks can still 
 | Area | Events |
 | --- | --- |
 | Sound | `sound.play`, `sound.stop`, `sound.pause`, `sound.resume`, `sound.volume`, `sound.pitch`, `sound.pan` |
-| Haptics | `haptic.play`, `haptic.stop`, `haptic.vibrate` |
+| Haptics | `haptic.play`, `haptic.pattern`, `haptic.stop`, `haptic.vibrate` |
 | Particles | `particle.emit`, `particle.start`, `particle.stop`, `particle.reset`, `particle.move` |
 | Shaders | `shader.send`, `shader.tween`, `shader.apply`, `shader.clear` |
 | Post | `post.set`, `post.tween`, `post.enable`, `post.disable`, `post.weight`, `post.clear` |
@@ -131,6 +131,10 @@ feel.define("ui.sweep", {
 
 ## Haptics
 
+The reusable composer and presets live in the standalone [`feel.haptics`](haptics.md)
+module. The LOVE adapter creates one at `fx.hapticEngine` and supplies the controller/system
+driver; the convenience methods below delegate to that engine.
+
 Register app-owned joysticks with `fx:haptic(name, joystickOrJoysticks, opts)` or `fx:haptics(map)`.
 
 ```lua
@@ -163,7 +167,8 @@ feel.define("p1.damage", {
 })
 ```
 
-Supported haptic events are `haptic.play`, `haptic.stop`, and `haptic.vibrate`. Use `fx:stopHaptic(name)` or `fx:stopHaptics()` for direct stop control.
+Supported haptic events are `haptic.play`, `haptic.pattern`, `haptic.stop`, and
+`haptic.vibrate`. Use `fx:stopHaptic(name)` or `fx:stopHaptics()` for direct stop control.
 
 ```lua
 feel.define("rumble.stop", {
@@ -174,6 +179,62 @@ feel.define("mobile.vibrate", {
   { kind = "emit", event = "haptic.vibrate", payload = { duration = 0.2 } },
 })
 ```
+
+### Reusable pulse patterns
+
+Register a named pattern when an effect needs more than one pulse. Each pulse accepts
+`value` or independent `left`/`right` motor strengths, `duration`, an optional quiet `gap`
+afterward, and an optional `system` override.
+
+Built-in patterns such as `tap`, `success`, `warning`, `error`, and `heartbeat` can be played
+without registration: `fx:playHapticPattern("success", { name = "p1" })`.
+
+```lua
+fx:hapticPattern("heartbeat", {
+  { value = 0.35, duration = 0.06, gap = 0.05 },
+  { value = 0.8, duration = 0.1 },
+})
+
+feel.define("player.low-health", {
+  {
+    kind = "emit",
+    event = "haptic.pattern",
+    payload = { pattern = "heartbeat", name = "p1", system = false },
+  },
+})
+```
+
+Call `fx:playHapticPattern("heartbeat", { name = "p1", system = false })` directly when a
+recipe is unnecessary. Starting the same pattern for the same target restarts it. Stop one
+controller-only pattern with `fx:stopHapticPattern("heartbeat", "p1", false)` or:
+
+```lua
+{ kind = "emit", event = "haptic.stop", payload = { pattern = "heartbeat", name = "p1", system = false } }
+```
+
+### Player settings and device lifecycle
+
+Use the master controller intensity (from `0` to `1`) for accessibility and preference settings:
+
+```lua
+fx:setHapticScale(0.5)       -- half-strength controller motors
+fx:setHapticsEnabled(false)  -- stops active output and blocks new feedback
+
+print(fx:hapticScale())
+print(fx:hapticsEnabled())
+```
+
+A scale of `0` stops and suppresses controller and system feedback. Other scale values affect
+controller motor strength; system vibration exposes duration but no intensity control.
+
+When controllers connect or disconnect, register the current device with `fx:haptic(name,
+joystick)` and call `fx:removeHaptic(name)` when it leaves. Replacing a registered name stops
+the old device first.
+
+LOVE currently exposes system vibration only on Android and iOS. On iOS, system vibration
+always lasts about 0.5 seconds regardless of the requested duration, so multi-pulse patterns
+are best targeted at controllers with `system = false`. Controller support should be checked
+through `Joystick:isVibrationSupported`; the adapter does this automatically.
 
 ## Particles
 
@@ -311,11 +372,13 @@ Supported camera events are `camera.shake`, `camera.zoom`, `camera.move`, and `c
 
 Screen events draw overlays through `fx:drawOverlay()`. Supported screen events are `screen.flash`, `screen.fade`, and `screen.clear`.
 
-Call both `feel.update(dt)` and `fx:update(dt)` from `love.update(dt)`. Adapter update advances camera/screen state and registered particle systems.
+Call both `feel.update(dt)` and `fx:update(dt)` from `love.update(dt)`. Adapter update advances
+haptic patterns, camera/screen state, and registered particle systems.
 
 ## Resetting Adapter State
 
 Call `fx:reset()` when leaving a scene or returning to a known visual baseline. It cancels
-adapter-owned camera, sound, shader, and post-processing animations, clears active screen
-feedback and shader stacking, and restores the adapter defaults. Registered assets remain
-available for the next scene.
+adapter-owned camera, sound, haptic-pattern, shader, and post-processing animations; stops
+active controller/system vibration; clears active screen feedback and shader stacking; and
+restores the adapter defaults. Registered assets and haptic patterns remain available for the
+next scene.
