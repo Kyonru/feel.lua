@@ -1,7 +1,7 @@
 ---@meta feel.haptics
 
 ---@class FeelHapticsModule
----@field presets table<string, FeelHapticPulse[]>
+---@field presets table<string, FeelHapticPulse[]|FeelHapticSegment[]>
 local feelHaptics = {}
 
 ---@class FeelHapticsDriver
@@ -16,6 +16,11 @@ local feelHaptics = {}
 ---@field scale? number
 ---@field duration? number
 ---@field presets? boolean Load the built-in presets. Defaults to true.
+---@field minPulse? number Minimum generated pulse duration. Defaults to 0.02 seconds.
+---@field maxPulse? number Maximum generated pulse duration. Defaults to 0.2 seconds.
+---@field minGap? number Minimum generated pulse gap. Defaults to 0.02 seconds.
+---@field maxGap? number Maximum generated pulse gap. Defaults to 0.2 seconds.
+---@field maxGeneratedPulses? integer Safety limit for one compiled pattern. Defaults to 2048.
 
 ---@class FeelHapticPulse
 ---@field value? number
@@ -24,8 +29,26 @@ local feelHaptics = {}
 ---@field right? number
 ---@field duration? number
 ---@field gap? number
+---@field delay? number Delay before this pulse.
 ---@field system? boolean
 ---@field [string] any
+
+---@class FeelHapticSegment
+---@field type "continuous"|"pulse"|"line"|"curve"
+---@field at? number Start time in seconds.
+---@field timestamp? number Alias for at.
+---@field duration number
+---@field intensity? number|FeelHapticValuePoint[]
+---@field frequency? number|FeelHapticValuePoint[]
+---@field value? number
+---@field left? number
+---@field right? number
+---@field system? boolean
+---@field [string] any
+
+---@class FeelHapticValuePoint
+---@field time number
+---@field value number
 
 ---@class FeelHapticPlayOptions
 ---@field target? string
@@ -50,7 +73,8 @@ local feelHaptics = {}
 
 ---@class FeelHaptics
 ---@field driver FeelHapticsDriver
----@field patterns table<string, FeelHapticPulse[]>
+---@field patterns table<string, FeelHapticPulse[]|FeelHapticSegment[]>
+---@field compiledPatterns table<string, FeelHapticPulse[]>
 ---@field runs table<integer, FeelHapticRun>
 ---@field defaultDuration number
 
@@ -71,16 +95,20 @@ local feelHaptics = {}
 function feelHaptics.new(driver, opts) end
 
 ---@param name string
----@param pattern FeelHapticPulse[]
+---@param pattern FeelHapticPulse[]|FeelHapticSegment[]
 ---@return FeelHaptics
 function FeelHaptics:define(name, pattern) end
 
----@param patterns? table<string, FeelHapticPulse[]>
+---@param patterns? table<string, FeelHapticPulse[]|FeelHapticSegment[]>
 ---@return FeelHaptics
 function FeelHaptics:defineAll(patterns) end
 
+---@param pattern FeelHapticPulse[]|FeelHapticSegment[]
+---@return FeelHapticPulse[]
+function FeelHaptics:compile(pattern) end
+
 ---@param name string
----@return FeelHapticPulse[]?
+---@return FeelHapticPulse[]|FeelHapticSegment[]|nil
 function FeelHaptics:get(name) end
 
 ---@return string[]
@@ -94,7 +122,7 @@ function FeelHaptics:remove(name) end
 ---@return boolean
 function FeelHaptics:trigger(payload) end
 
----@param nameOrPattern string|FeelHapticPulse[]
+---@param nameOrPattern string|FeelHapticPulse[]|FeelHapticSegment[]
 ---@param opts? FeelHapticPlayOptions
 ---@return FeelHapticRun|false
 function FeelHaptics:play(nameOrPattern, opts) end

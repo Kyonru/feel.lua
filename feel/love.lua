@@ -110,6 +110,8 @@ Adapter.__index = Adapter
 ---@field target? string Haptic target name; alias for name.
 ---@field system? boolean
 
+---@alias FeelLoveHapticPattern FeelLoveHapticPulse[]|FeelHapticSegment[]
+
 ---@class FeelLoveHapticEntry
 ---@field name string
 ---@field joysticks FeelLoveJoystickLike[]
@@ -1167,14 +1169,14 @@ function Adapter:removeHaptic(name)
 end
 
 ---@param name string
----@param pulses FeelLoveHapticPulse[]
+---@param pulses FeelLoveHapticPattern
 ---@return FeelLoveAdapter
 function Adapter:hapticPattern(name, pulses)
   self.hapticEngine:define(name, pulses)
   return self
 end
 
----@param patterns? table<string, FeelLoveHapticPulse[]>
+---@param patterns? table<string, FeelLoveHapticPattern>
 ---@return FeelLoveAdapter
 function Adapter:hapticPatterns(patterns)
   for name, pulses in pairs(patterns or {}) do

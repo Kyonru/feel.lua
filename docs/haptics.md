@@ -13,8 +13,8 @@ only `feel.haptics`, or copy `feel/haptics.lua` into another project as `haptics
 
 The module takes inspiration from [Pulsar](https://github.com/software-mansion/pulsar):
 haptic feedback is treated as reusable design material rather than scattered calls to a
-vibration API. Feel keeps the model deliberately small for game runtimes—each pattern is a
-sequence of motor pulses separated by optional gaps.
+vibration API. Feel supports both direct pulse sequences and higher-level timestamped
+segments that compile to hardware-friendly pulses.
 
 ## Use It with LOVE
 
@@ -66,6 +66,11 @@ Every engine includes these presets by default:
 | `error` | Failed or rejected action |
 | `heartbeat` | Urgency or low health |
 
+The expressive collection also includes `softTap`, `doubleTap`, `tripleTap`, `longPress`,
+`rumble`, `drone`, `flutter`, `trill`, `alert`, `reject`, `alarm`, `waltz`, `warDrum`,
+`thunder`, `finale`, `drumroll`, `crescendo`, `morse`, `siren`, `shudder`, `windup`, and
+`unwind`.
+
 Use `haptics:list()` to discover registered patterns and `haptics:get(name)` to receive a
 copy safe to inspect or modify. Pass `{ presets = false }` to `new` for an empty engine.
 
@@ -101,6 +106,61 @@ haptics:play({
 
 Starting the same named pattern on the same target restarts it by default. Pass
 `restart = false` to allow both runs.
+
+## Timeline Composer
+
+For more expressive feedback, define timestamped `continuous`, `pulse`, or `line` segments.
+Times are in seconds, and overlapping segments are combined using the strongest value for
+each motor.
+
+```lua
+haptics:define("power-up", {
+  {
+    type = "line",
+    at = 0,
+    duration = 1.2,
+    intensity = {
+      { time = 0, value = 0.1 },
+      { time = 0.8, value = 0.6 },
+      { time = 1.2, value = 1.0 },
+    },
+    frequency = {
+      { time = 0, value = 0.2 },
+      { time = 1.2, value = 0.95 },
+    },
+  },
+  { type = "continuous", at = 1.25, duration = 0.18, intensity = 1 },
+})
+```
+
+- `continuous` holds one intensity for its duration.
+- `pulse` generates a pulse train. Intensity controls motor strength and pulse length;
+  frequency controls the spacing between pulses.
+- `line` and its `curve` alias interpolate intensity and frequency control points over time.
+- `at` and `timestamp` are aliases.
+
+Keep sequential pulse entries and timeline segments in separate patterns; the two timing
+models cannot be mixed implicitly.
+
+Use `haptics:compile(pattern)` to inspect the resulting discrete pulses. Tune generation with
+`minPulse`, `maxPulse`, `minGap`, and `maxGap` when constructing the engine.
+
+## Performance
+
+Named patterns compile once in `define`, including built-in presets during engine creation.
+Playback does not resample curves or resolve overlaps; it only stores the compiled pulse list
+and dispatches pulses as `update(dt)` crosses their timestamps.
+
+The practical costs are:
+
+- Compilation: proportional to generated intervals and their overlap boundaries. This is
+  normally sub-millisecond for UI/game patterns and happens outside the frame loop.
+- Playback: constant work on frames without a pulse, then one driver call per pulse crossed.
+- Memory: one small table per compiled pulse plus one lightweight table per active playback.
+
+`maxGeneratedPulses` defaults to `2048` and rejects pathological patterns before they can
+produce unbounded work. Anonymous timeline patterns compile when played, so define frequently
+reused or complex patterns by name.
 
 ## Control and Cancellation
 
@@ -153,6 +213,6 @@ requested duration in favor of a fixed vibration. See LOVE's
 [`Joystick:setVibration`](https://love2d.org/wiki/Joystick%3AsetVibration) and
 [`love.system.vibrate`](https://love2d.org/wiki/love.system.vibrate) documentation.
 
-Those limits are why the composer uses discrete pulses rather than promising continuous
-amplitude/frequency envelopes on every target. Prefer controller-only patterns
-(`system = false`) when precise timing matters.
+The composer approximates continuous amplitude/frequency envelopes as discrete pulses because
+that is the common capability across targets. Prefer controller-only patterns (`system =
+false`) when precise intensity and timing matter.

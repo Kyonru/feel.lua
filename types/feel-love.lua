@@ -97,6 +97,8 @@ local feelLove = {}
 ---@field target? string Haptic target name; alias for name.
 ---@field system? boolean
 
+---@alias FeelLoveHapticPattern FeelLoveHapticPulse[]|FeelHapticSegment[]
+
 ---@class FeelLoveHapticEntry
 ---@field name string
 ---@field joysticks FeelLoveJoystickLike[]
@@ -292,11 +294,11 @@ function FeelLoveAdapter:haptic(name, joystickOrJoysticks, opts) end
 function FeelLoveAdapter:removeHaptic(name) end
 
 ---@param name string
----@param pulses FeelLoveHapticPulse[]
+---@param pulses FeelLoveHapticPattern
 ---@return FeelLoveAdapter
 function FeelLoveAdapter:hapticPattern(name, pulses) end
 
----@param patterns? table<string, FeelLoveHapticPulse[]>
+---@param patterns? table<string, FeelLoveHapticPattern>
 ---@return FeelLoveAdapter
 function FeelLoveAdapter:hapticPatterns(patterns) end
 

@@ -183,6 +183,7 @@ local haptics = require("lib.feel.haptics").new({
 })
 
 haptics:play("success")
+haptics:play("crescendo") -- generated intensity/frequency envelope
 
 function update(dt)
   haptics:update(dt)

@@ -231,6 +231,71 @@ Feedbacks.play("enemy.hit-heavy", { name = "enemy" })
 Available factories are `hitLight`, `hitHeavy`, `cameraPunch`, and `modelImpact`. Their
 results are ordinary manifest tables, so copy or extend them when the effect needs to grow.
 
+## Bomb: Tick, Tick, Boom
+
+Build anticipation with two increasingly strong ticks, then release sound, controller
+rumble, flash, camera shake, and particles together. The haptic rumble uses the timeline
+composer so the initial impact can decay into a rough tail.
+
+```lua
+-- Register app-owned assets first. Substitute your own sources and particle system.
+fx:sounds({
+  bombTick = tickSource,
+  bombBoom = boomSource,
+})
+fx:particle("bomb", explosionParticles)
+
+fx:hapticPattern("bomb.rumble", {
+  { type = "continuous", at = 0, duration = 0.16, intensity = 1 },
+  {
+    type = "line",
+    at = 0.12,
+    duration = 0.65,
+    intensity = { { time = 0, value = 0.75 }, { time = 0.65, value = 0.2 } },
+    frequency = { { time = 0, value = 0.3 }, { time = 0.65, value = 0.7 } },
+  },
+})
+
+feel.define("bomb.tick-tick-boom", {
+  {
+    kind = "parallel",
+    steps = {
+      { kind = "audio", cue = "bombTick" },
+      { kind = "emit", event = "haptic.play", payload = { value = 0.3, duration = 0.035, system = false } },
+      { kind = "emit", event = "screen.flash", payload = { amount = 0.08, duration = 0.05 } },
+    },
+  },
+  { kind = "wait", duration = 0.4 },
+  {
+    kind = "parallel",
+    steps = {
+      { kind = "audio", cue = "bombTick" },
+      { kind = "emit", event = "haptic.play", payload = { value = 0.55, duration = 0.05, system = false } },
+      { kind = "emit", event = "screen.flash", payload = { amount = 0.14, duration = 0.06 } },
+    },
+  },
+  { kind = "wait", duration = 0.34 },
+  {
+    kind = "parallel",
+    steps = {
+      { kind = "audio", cue = "bombBoom" },
+      { kind = "emit", event = "haptic.pattern", payload = { pattern = "bomb.rumble", system = false } },
+      { kind = "emit", event = "screen.flash", payload = { amount = 0.8, duration = 0.16 } },
+      { kind = "emit", event = "camera.shake", payload = { amount = 14, duration = 0.45 } },
+      { kind = "emit", event = "particle.emit", payload = { name = "bomb", count = 48 } },
+    },
+  },
+})
+
+feel.play("bomb.tick-tick-boom", nil, fx:handlers({
+  restart = true,
+  key = "bomb.countdown",
+}))
+```
+
+If your game needs a real fuse timer, keep that timing in gameplay code and trigger this
+recipe only for presentation. Feedback sequences should not decide when damage occurs.
+
 ## Heartbeat Haptic Pattern
 
 The standalone haptics module includes a `heartbeat` preset. The LOVE adapter advances it

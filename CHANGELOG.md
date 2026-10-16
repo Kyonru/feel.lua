@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Added a standalone, core-independent `feel.haptics` module with its own update clock, a hardware-independent driver API, built-in feedback presets, reusable timed pulse patterns, playback handles, defensive pattern discovery, master intensity and enable controls, per-target restart/cancellation, and editor type definitions. The LOVE adapter now delegates its haptic API to this engine and adds safe device replacement/removal and reset-time vibration cleanup.
+- Added a standalone, core-independent `feel.haptics` module with its own update clock, a hardware-independent driver API, an expanded expressive preset catalog, reusable timed pulse patterns, a Pulsar-inspired timeline composer with continuous/pulse/curve segments and overlap resolution, playback handles, defensive pattern discovery, master intensity and enable controls, per-target restart/cancellation, generated-pulse safety limits, and editor type definitions. The LOVE adapter now delegates its haptic API to this engine and adds safe device replacement/removal and reset-time vibration cleanup.
 - Added a practical Recipes guide with copyable UI, combat, pickup, loop, transition, channel, and preset patterns.
 - Fixed cancellation of parallel runs so stopping or restarting a parent reliably cancels every child branch, and target-specific clear now cancels the owning run tree instead of stranding its parent.
 - Made nested pause state compositional: children remain effectively paused while an ancestor is paused, and independently paused branches stay paused when a parent resumes.

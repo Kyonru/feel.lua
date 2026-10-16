@@ -47,7 +47,10 @@ describe("feel.haptics", function()
     local tap = haptics:get("tap")
     tap[1].value = 0
     assert.is_true(haptics:get("tap")[1].value > 0)
-    assert.are.equal("error", haptics:list()[1])
+    assert.are.equal("alarm", haptics:list()[1])
+    assert.is_not_nil(haptics:get("crescendo"))
+    assert.is_not_nil(haptics:get("siren"))
+    assert.is_not_nil(haptics:get("thunder"))
   end)
 
   it("composes named multi-pulse patterns on its independent clock", function()
@@ -74,6 +77,77 @@ describe("feel.haptics", function()
     haptics:play({ { value = 0.4, duration = 0.05, actuator = "trigger" } })
     assert.are.equal("trigger", played[1].actuator)
     assert.is_nil(played[1].gap)
+  end)
+
+  it("compiles timestamped and overlapping continuous segments", function()
+    local haptics = engine({ presets = false })
+    local pattern = haptics:compile({
+      { type = "continuous", at = 0.1, duration = 0.1, intensity = 0.4 },
+      { type = "continuous", at = 0.15, duration = 0.1, intensity = 0.8 },
+    })
+
+    assert.are.equal(2, #pattern)
+    assert.are.equal(0.1, pattern[1].delay)
+    assert.are.near(0.05, pattern[1].duration, 0.000001)
+    assert.are.equal(0.4, pattern[1].value)
+    assert.are.near(0.1, pattern[2].duration, 0.000001)
+    assert.are.equal(0.8, pattern[2].value)
+  end)
+
+  it("generates pulse trains from intensity and frequency", function()
+    local haptics = engine({ presets = false })
+    local pattern = haptics:compile({
+      { type = "pulse", duration = 0.5, intensity = 0.6, frequency = 0.9 },
+    })
+
+    assert.is_true(#pattern > 2)
+    assert.are.equal(0.6, pattern[1].value)
+    assert.is_true(pattern[2].delay > 0)
+  end)
+
+  it("samples line intensity and frequency envelopes", function()
+    local haptics = engine({ presets = false })
+    local pattern = haptics:compile({
+      {
+        type = "line",
+        duration = 0.8,
+        intensity = { { time = 0, value = 0.1 }, { time = 0.8, value = 1 } },
+        frequency = { { time = 0, value = 0.2 }, { time = 0.8, value = 0.95 } },
+      },
+    })
+
+    assert.is_true(#pattern > 1)
+    assert.is_true(pattern[1].value < pattern[#pattern].value)
+    assert.is_true(pattern[2].delay > 0)
+  end)
+
+  it("honors an initial timeline delay during playback", function()
+    local haptics = engine({ presets = false })
+    haptics:play({ { type = "continuous", at = 0.2, duration = 0.05, intensity = 0.7 } }, { system = false })
+
+    assert.are.equal(0, #played)
+    haptics:update(0.199)
+    assert.are.equal(0, #played)
+    haptics:update(0.002)
+    assert.are.equal(0.7, played[1].value)
+    assert.is_false(played[1].system)
+  end)
+
+  it("caps generated pattern complexity", function()
+    local haptics = engine({ presets = false, maxGeneratedPulses = 2 })
+    assert.has_error(function()
+      haptics:compile({ { type = "pulse", duration = 2, intensity = 0.1, frequency = 1 } })
+    end, "haptic pattern exceeds maxGeneratedPulses")
+  end)
+
+  it("rejects ambiguous mixes of sequential and timeline timing", function()
+    local haptics = engine({ presets = false })
+    assert.has_error(function()
+      haptics:compile({
+        { type = "continuous", duration = 0.1 },
+        { value = 0.5, duration = 0.1 },
+      })
+    end, "cannot mix sequential pulses with timeline segments")
   end)
 
   it("restarts the same pattern and can cancel a target", function()
