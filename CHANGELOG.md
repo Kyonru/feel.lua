@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added a practical Recipes guide with copyable UI, combat, pickup, loop, transition, channel, and preset patterns.
 - Fixed cancellation of parallel runs so stopping or restarting a parent reliably cancels every child branch, and target-specific clear now cancels the owning run tree instead of stranding its parent.
 - Made nested pause state compositional: children remain effectively paused while an ancestor is paused, and independently paused branches stay paused when a parent resumes.
 - Stabilized raw and sequenced springs across large frame deltas by internally substepping integration.

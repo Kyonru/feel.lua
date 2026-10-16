@@ -114,6 +114,7 @@ See [Core Runner](core-runner.md#feedback-channels) for `map`/`clear` and more.
 
 ## Where To Go Next
 
+- [Recipes](recipes.md) provides copyable patterns for common UI and gameplay feedback.
 - [Sequence Steps](sequence-steps.md) lists every step kind and its fields.
 - [Core Runner](core-runner.md) explains restart behavior, nested sequences, and clearing.
 - [LOVE Adapter](love-adapter.md) handles registered sounds, particles, shaders, haptics, camera, screen overlays, and post-processing.

@@ -20,15 +20,17 @@ Use it when an action should read better: a button press, player hit, reward rev
 
 1. [Installation](installation.md): add the core module and, optionally, the LOVE adapter.
 2. [Getting Started](getting-started.md): build a minimal LOVE loop with one animated target and one sequence.
-3. [Sequence Steps](sequence-steps.md): learn the table shapes that make up a recipe.
-4. [LOVE Adapter](love-adapter.md): connect recipe events to sounds, haptics, particles, shaders, camera, screen, and post effects.
-5. [LOVE Examples](love-examples.md): run the showcase or the Asteroidz example.
+3. [Recipes](recipes.md): copy practical patterns for UI, impacts, pickups, loops, and transitions.
+4. [Sequence Steps](sequence-steps.md): learn the table shapes that make up a recipe.
+5. [LOVE Adapter](love-adapter.md): connect recipe events to sounds, haptics, particles, shaders, camera, screen, and post effects.
+6. [LOVE Examples](love-examples.md): run the showcase or the Asteroidz example.
 
 ## Guides
 
 | Page                                  | Use it for                                                                                                                        |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | [Core Runner](core-runner.md)         | Targets, named sequences, playback, updates, clearing, and callback context.                                                      |
+| [Recipes](recipes.md)                 | Copyable patterns for UI presses, impacts, pickups, loops, transitions, and feedback presets.                                    |
 | [Sequence Steps](sequence-steps.md)   | `animate`, `emit`, `audio`, `wait`, `play`, `parallel`, `repeat`, `random`, `callback`, and `log`.                                |
 | [API](api.md)                         | Compact function signatures, options, and exported helpers.                                                                       |
 | [Autocomplete](autocomplete.md)       | LuaLS setup, local definition files, LOVE2D types, and custom target values.                                                      |

@@ -51,6 +51,7 @@ nav = [
   { "Overview" = "index.md" },
   { "Installation" = "installation.md" },
   { "Getting Started" = "getting-started.md" },
+  { "Recipes" = "recipes.md" },
   { "Core" = [
     { "API" = "api.md" },
     { "Core Runner" = "core-runner.md" },
