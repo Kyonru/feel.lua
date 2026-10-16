@@ -4,6 +4,10 @@ icon: lucide/book-open
 
 # API
 
+<!-- feel:feature-gif host-integration -->
+![Animated GIF mapping recipe emit, audio, callback, and log steps to host-owned results.](assets/feature-gifs/host-integration.gif)
+<!-- /feel:feature-gif host-integration -->
+
 ## Core Functions
 
 | Function | Purpose |

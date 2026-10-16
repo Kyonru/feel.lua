@@ -48,30 +48,16 @@ Use it when an action should read better: a button press, player hit, reward rev
 | [Asteroidz Walkthrough](asteroidz.md) | A small game showing sequences, post-processing, UI juice, and adapter events together.                                           |
 
 <!-- feel:feature-gif-gallery -->
-
 ## Feature GIFs
 
-| Feature         | Preview                                                                                                                                 |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Getting Started | ![Animated GIF showing a Feel.lua button press sequence with glow and sparks.](assets/feature-gifs/getting-started.gif)                 |
-| Animate         | ![Animated GIF showing Feel.lua animate steps moving and scaling a card.](assets/feature-gifs/animate.gif)                              |
-| Easing          | ![Animated GIF comparing linear, quadout, sineinout, backout, elasticout, and bounceout easing motion.](assets/feature-gifs/easing.gif) |
-| Sequence        | ![Animated GIF showing Feel.lua steps running one after another.](assets/feature-gifs/sequence.gif)                                     |
-| Parallel        | ![Animated GIF showing parallel Feel.lua branches animating together.](assets/feature-gifs/parallel.gif)                                |
-| Repeat          | ![Animated GIF showing a repeated Feel.lua step ticking three times.](assets/feature-gifs/repeat.gif)                                   |
-| Random          | ![Animated GIF showing a deterministic random branch choosing one weighted result.](assets/feature-gifs/random.gif)                     |
-| Callbacks       | ![Animated GIF showing emit, audio, callback, and log events landing in an event stream.](assets/feature-gifs/callbacks.gif)            |
-| Pulse           | ![Animated GIF showing a target pulse with scale and glow feedback.](assets/feature-gifs/pulse.gif)                                     |
-| Shake           | ![Animated GIF showing Feel.lua camera shake applied to a small game scene.](assets/feature-gifs/shake.gif)                             |
-| Flash           | ![Animated GIF showing a screen flash overlay after an impact.](assets/feature-gifs/flash.gif)                                          |
-| Sound           | ![Animated GIF showing sound volume, pitch, and pan feedback meters.](assets/feature-gifs/sound.gif)                                    |
-| Haptics         | ![Animated GIF showing left and right haptic rumble meters driven by feedback.](assets/feature-gifs/haptics.gif)                        |
-| Particles       | ![Animated GIF showing particle bursts emitted from a Feel.lua event.](assets/feature-gifs/particles.gif)                               |
-| Shader          | ![Animated GIF showing a shader uniform pulse around an actor.](assets/feature-gifs/shader.gif)                                         |
-| Post Processing | ![Animated GIF showing bloom and chromatic post-processing feedback on a scene.](assets/feature-gifs/post-processing.gif)               |
-| Feedbacks       | ![Animated GIF showing one named feedback stack triggering camera, flash, post, and model cues.](assets/feature-gifs/feedbacks.gif)     |
-| LOVE2D          | ![Animated GIF showing Feel.lua driving a compact LOVE2D mini-scene.](assets/feature-gifs/love2d.gif)                                   |
-| g3d             | ![Animated GIF showing Feel.lua g3d helper-style model and camera feedback in a 3D scene.](assets/feature-gifs/g3d.gif)                 |
-| Menori          | ![Animated GIF showing Feel.lua Menori helper-style node, camera, animation, and uniform feedback.](assets/feature-gifs/menori.gif)     |
-
+| Feature | Preview |
+| --- | --- |
+| Motion Basics | ![Animated GIF showing a heart pulse built from numeric animation, easing, and a short reusable recipe.](assets/feature-gifs/motion-basics.gif) |
+| Combo Recipe | ![Animated GIF showing a three-hit platformer combo composed with sequence, repeat, random, and parallel steps.](assets/feature-gifs/combo-recipe.gif) |
+| Host Integration | ![Animated GIF mapping recipe emit, audio, callback, and log steps to host-owned results.](assets/feature-gifs/host-integration.gif) |
+| Impact Feedback | ![Animated GIF showing one impact recipe combining camera shake, flash, particles, sound, and post-processing.](assets/feature-gifs/impact-feedback.gif) |
+| Haptics | ![Animated GIF showing asymmetric haptic motor strength on a game controller.](assets/feature-gifs/haptics.gif) |
+| Sprite / Anim8 | ![Animated GIF showing renderer-independent sprite recoil, squash, flash, and an optional Anim8 draw path.](assets/feature-gifs/sprite.gif) |
+| g3d | ![Animated GIF showing one projected cube responding to g3d camera field of view, camera shake, model scale, and 3D rotation feedback.](assets/feature-gifs/g3d.gif) |
+| Menori | ![Animated GIF showing a projected cube rotating through a Menori camera orbit while its node scale and material tint react.](assets/feature-gifs/menori.gif) |
 <!-- /feel:feature-gif-gallery -->

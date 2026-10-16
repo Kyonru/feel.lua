@@ -4,6 +4,10 @@ icon: lucide/person-standing
 
 # Sprite Effects
 
+<!-- feel:feature-gif sprite -->
+![Animated GIF showing renderer-independent sprite recoil, squash, flash, and an optional Anim8 draw path.](assets/feature-gifs/sprite.gif)
+<!-- /feel:feature-gif sprite -->
+
 `feel.sprite` adds reusable 2D sprite reactions without owning a renderer, spritesheet, or
 animation clock. It produces ordinary Feel target values that compose with your existing
 position, rotation, scale, tint, and opacity.

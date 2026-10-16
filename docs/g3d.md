@@ -5,7 +5,7 @@ icon: lucide/box
 # g3d Helpers
 
 <!-- feel:feature-gif g3d -->
-![Animated GIF showing Feel.lua g3d helper-style model and camera feedback in a 3D scene.](assets/feature-gifs/g3d.gif)
+![Animated GIF showing one projected cube responding to g3d camera field of view, camera shake, model scale, and 3D rotation feedback.](assets/feature-gifs/g3d.gif)
 <!-- /feel:feature-gif g3d -->
 
 `feel.g3d` is an optional helper for [groverburger/g3d](https://github.com/groverburger/g3d). It binds `feel.target` values to app-owned g3d models and cameras. It does not load assets, draw models, wrap collisions, or replace g3d controls.

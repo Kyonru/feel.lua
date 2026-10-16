@@ -4,6 +4,10 @@ icon: lucide/vibrate
 
 # Haptics
 
+<!-- feel:feature-gif haptics -->
+![Animated GIF showing asymmetric haptic motor strength on a game controller.](assets/feature-gifs/haptics.gif)
+<!-- /feel:feature-gif haptics -->
+
 `feel.haptics` is a small, hardware-independent haptic pattern engine. It turns named
 patterns into timed pulses on its own clock, provides useful presets, and centralizes
 intensity, enable/disable, restart, and cancellation behavior.

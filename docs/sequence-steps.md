@@ -4,9 +4,9 @@ icon: lucide/list-tree
 
 # Sequence Steps
 
-<!-- feel:feature-gif sequence -->
-![Animated GIF showing Feel.lua steps running one after another.](assets/feature-gifs/sequence.gif)
-<!-- /feel:feature-gif sequence -->
+<!-- feel:feature-gif combo-recipe -->
+![Animated GIF showing a three-hit platformer combo composed with sequence, repeat, random, and parallel steps.](assets/feature-gifs/combo-recipe.gif)
+<!-- /feel:feature-gif combo-recipe -->
 
 Each step is a table with a `kind`. Steps run in order unless a control-flow step changes how child steps are played.
 

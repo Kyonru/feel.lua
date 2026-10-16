@@ -4,6 +4,10 @@ icon: lucide/cpu
 
 # Core Runner
 
+<!-- feel:feature-gif motion-basics -->
+![Animated GIF showing a heart pulse built from numeric animation, easing, and a short reusable recipe.](assets/feature-gifs/motion-basics.gif)
+<!-- /feel:feature-gif motion-basics -->
+
 The core runner stores named feedback recipes, plays named or inline sequences, advances active work through `feel.update(dt)`, and leaves rendering or side effects to your app.
 
 ## Targets

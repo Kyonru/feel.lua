@@ -131,6 +131,31 @@ function Draw.chipRow(items, x, y, font)
   end
 end
 
+function Draw.feedbackChip(text, x, y, color, font, alpha)
+  font = font or love.graphics.getFont()
+  alpha = alpha or 1
+  love.graphics.setFont(font)
+  local w = font:getWidth(text) + 34
+  local h = 30
+  Draw.setColor(Draw.palette.panel2, 0.96 * alpha)
+  love.graphics.rectangle("fill", x, y, w, h, 2, 2)
+  Draw.setColor(color, 0.78 * alpha)
+  love.graphics.rectangle("fill", x, y, 5, h)
+  Draw.setColor(color, 0.56 * alpha)
+  love.graphics.rectangle("line", x + 0.5, y + 0.5, w - 1, h - 1, 2, 2)
+  Draw.setColor(Draw.palette.ink, 0.94 * alpha)
+  love.graphics.print(text, x + 17, y + 7)
+  return w, h
+end
+
+function Draw.feedbackRow(items, x, y, font)
+  local cursor = x
+  for _, item in ipairs(items or {}) do
+    local w = Draw.feedbackChip(item.text, cursor, y, item.color or Draw.palette.cyan, font, item.alpha or 1)
+    cursor = cursor + w + 7
+  end
+end
+
 function Draw.card(x, y, w, h, color, label, font, selected, glow)
   Draw.shadow(x + 6, y + 10, w, h, 10, selected and 0.34 or 0.22)
   if glow and glow > 0 then
@@ -178,10 +203,10 @@ function Draw.meter(x, y, w, h, value, color, label, font)
   end
 end
 
-function Draw.ring(x, y, radius, progress, color, alpha)
+function Draw.ring(x, y, radius, progress, color, alpha, lineWidth)
   progress = Draw.clamp(progress, 0, 1)
   Draw.setColor(color, alpha or 0.85)
-  love.graphics.setLineWidth(4)
+  love.graphics.setLineWidth(lineWidth or 4)
   local segments = math.max(6, math.floor(64 * progress))
   local points = {}
   for i = 0, segments do
@@ -215,6 +240,22 @@ function Draw.star(x, y, radius, color, alpha)
     x - radius, y,
     x - radius * 0.26, y - radius * 0.26
   )
+end
+
+function Draw.heart(x, y, size, color, alpha, scale, mode, lineWidth)
+  local points = {}
+  scale = scale or 1
+  for i = 0, 64 do
+    local angle = i / 64 * math.pi * 2
+    local px = 16 * math.sin(angle) ^ 3
+    local py = 13 * math.cos(angle) - 5 * math.cos(angle * 2) - 2 * math.cos(angle * 3) - math.cos(angle * 4)
+    points[#points + 1] = x + px / 17 * size * scale
+    points[#points + 1] = y - py / 17 * size * scale
+  end
+  Draw.setColor(color, alpha or 1)
+  love.graphics.setLineWidth(lineWidth or 1)
+  love.graphics.polygon(mode or "fill", points)
+  love.graphics.setLineWidth(1)
 end
 
 function Draw.wave(x, y, w, h, amount, color)
@@ -259,19 +300,31 @@ function Draw.ship(x, y, rotation, color, scale)
   love.graphics.pop()
 end
 
-function Draw.controller(x, y, left, right, color)
-  Draw.shadow(x + 8, y + 12, 224, 108, 22, 0.24)
-  Draw.setColor(Draw.palette.panel2)
-  love.graphics.rectangle("fill", x, y, 224, 108, 24, 24)
-  Draw.setColor(color, 0.72)
-  love.graphics.rectangle("line", x, y, 224, 108, 24, 24)
-  Draw.setColor(Draw.palette.faint)
-  love.graphics.circle("fill", x + 62, y + 54, 25)
-  love.graphics.circle("fill", x + 162, y + 54, 25)
-  Draw.setColor(color, 0.2 + left * 0.72)
-  love.graphics.circle("fill", x + 62, y + 54, 18 + left * 12)
-  Draw.setColor(color, 0.2 + right * 0.72)
-  love.graphics.circle("fill", x + 162, y + 54, 18 + right * 12)
+function Draw.controller(image, x, y, left, right, leftColor, rightColor)
+  local scale = 2.5
+  local leftX = x - 90
+  local rightX = x + 90
+  local motorY = y + 46
+
+  Draw.shadow(x - 132, y + 78, 264, 24, 12, 0.28)
+  Draw.setColor(leftColor, 0.08 + left * 0.18)
+  love.graphics.circle("fill", leftX, motorY, 31 + left * 18)
+  Draw.setColor(rightColor, 0.08 + right * 0.18)
+  love.graphics.circle("fill", rightX, motorY, 31 + right * 18)
+
+  Draw.setColor({ 1, 1, 1, 1 })
+  love.graphics.draw(image, x, y, 0, scale, scale, image:getWidth() / 2, image:getHeight() / 2)
+
+  Draw.setColor(Draw.palette.panel2, 0.9)
+  love.graphics.circle("fill", leftX, motorY, 12)
+  love.graphics.circle("fill", rightX, motorY, 12)
+  Draw.setColor(leftColor, 0.34 + left * 0.66)
+  love.graphics.circle("fill", leftX, motorY, 6 + left * 5)
+  Draw.setColor(rightColor, 0.34 + right * 0.66)
+  love.graphics.circle("fill", rightX, motorY, 6 + right * 5)
+
+  Draw.ring(leftX, motorY, 28 + left * 22, 1, leftColor, left * 0.82)
+  Draw.ring(rightX, motorY, 28 + right * 22, 1, rightColor, right * 0.82)
 end
 
 function Draw.isoBox(x, y, w, h, depth, color, scale, rotation)
@@ -296,6 +349,213 @@ function Draw.isoBox(x, y, w, h, depth, color, scale, rotation)
   love.graphics.rectangle("line", -w / 2, -h / 2, w, h, 4, 4)
   love.graphics.setLineWidth(1)
   love.graphics.pop()
+end
+
+function Draw.cube3d(x, y, size, yaw, pitch, roll, color, fov, scale)
+  yaw = yaw or 0
+  pitch = pitch or 0
+  roll = roll or 0
+  fov = fov or 60
+  scale = scale or 1
+
+  local cy, sy = math.cos(yaw), math.sin(yaw)
+  local cp, sp = math.cos(pitch), math.sin(pitch)
+  local cr, sr = math.cos(roll), math.sin(roll)
+  local distance = 4.5
+  local focalScale = 60 / math.max(30, fov)
+  local source = {
+    { -1, -1, -1 }, { 1, -1, -1 },
+    { 1, 1, -1 }, { -1, 1, -1 },
+    { -1, -1, 1 }, { 1, -1, 1 },
+    { 1, 1, 1 }, { -1, 1, 1 },
+  }
+  local points = {}
+  local transformed = {}
+
+  for i, vertex in ipairs(source) do
+    local vx, vy, vz = vertex[1], vertex[2], vertex[3]
+    local yawX = vx * cy + vz * sy
+    local yawZ = -vx * sy + vz * cy
+    local pitchY = vy * cp - yawZ * sp
+    local pitchZ = vy * sp + yawZ * cp
+    local rollX = yawX * cr - pitchY * sr
+    local rollY = yawX * sr + pitchY * cr
+    local perspective = size * scale * focalScale * distance / (distance + pitchZ)
+    points[i] = { x + rollX * perspective, y - rollY * perspective }
+    transformed[i] = { rollX, rollY, pitchZ }
+  end
+
+  local faces = {
+    { indices = { 1, 2, 3, 4 }, shade = 0.02 },
+    { indices = { 5, 8, 7, 6 }, shade = -0.32 },
+    { indices = { 1, 4, 8, 5 }, shade = -0.22 },
+    { indices = { 2, 6, 7, 3 }, shade = -0.1 },
+    { indices = { 4, 3, 7, 8 }, shade = 0.22 },
+    { indices = { 1, 5, 6, 2 }, shade = -0.38 },
+  }
+
+  for _, face in ipairs(faces) do
+    face.depth = 0
+    for _, index in ipairs(face.indices) do
+      face.depth = face.depth + transformed[index][3]
+    end
+    face.depth = face.depth / #face.indices
+  end
+  table.sort(faces, function(a, b) return a.depth > b.depth end)
+
+  for _, face in ipairs(faces) do
+    local polygon = {}
+    for _, index in ipairs(face.indices) do
+      polygon[#polygon + 1] = points[index][1]
+      polygon[#polygon + 1] = points[index][2]
+    end
+    local faceColor
+    if face.shade >= 0 then
+      faceColor = Draw.mixColor(color, { 1, 1, 1, 1 }, face.shade)
+    else
+      faceColor = Draw.mixColor(color, { 0, 0, 0, 1 }, -face.shade)
+    end
+    Draw.setColor(faceColor)
+    love.graphics.polygon("fill", polygon)
+    Draw.setColor(Draw.palette.ink, 0.34)
+    love.graphics.setLineWidth(2)
+    love.graphics.polygon("line", polygon)
+  end
+  love.graphics.setLineWidth(1)
+end
+
+local function nearestImage(path)
+  local image = love.graphics.newImage(path)
+  image:setFilter("nearest", "nearest")
+  return image
+end
+
+local function imagePair(root, first, second)
+  return { nearestImage(root .. first), nearestImage(root .. second) }
+end
+
+-- Kenney New Platformer Pack 1.1 (CC0): https://kenney.nl/assets/new-platformer-pack
+-- Only the selected frames used by these captures are vendored with the app.
+function Draw.loadKenneyPlatformer()
+  local root = "assets/kenney-new-platformer/"
+  local actorRoot = root .. "actors/"
+  local backgroundRoot = root .. "backgrounds/"
+  local terrainRoot = root .. "terrain/"
+  return {
+    actors = {
+      mouse = imagePair(actorRoot, "mouse_walk_a.png", "mouse_walk_b.png"),
+      snail = imagePair(actorRoot, "snail_walk_a.png", "snail_walk_b.png"),
+      ladybug = imagePair(actorRoot, "ladybug_walk_a.png", "ladybug_walk_b.png"),
+      worm = imagePair(actorRoot, "worm_normal_move_a.png", "worm_normal_move_b.png"),
+      slime = imagePair(actorRoot, "slime_normal_walk_a.png", "slime_normal_walk_b.png"),
+      fireSlime = imagePair(actorRoot, "slime_fire_walk_a.png", "slime_fire_walk_b.png"),
+      spikeSlime = imagePair(actorRoot, "slime_spike_walk_a.png", "slime_spike_walk_b.png"),
+      bee = imagePair(actorRoot, "bee_a.png", "bee_b.png"),
+      fly = imagePair(actorRoot, "fly_a.png", "fly_b.png"),
+      fish = imagePair(actorRoot, "fish_blue_swim_a.png", "fish_blue_swim_b.png"),
+    },
+    themes = {
+      hills = {
+        background = nearestImage(backgroundRoot .. "background_color_hills.png"),
+        ground = {
+          nearestImage(terrainRoot .. "terrain_grass_horizontal_left.png"),
+          nearestImage(terrainRoot .. "terrain_grass_horizontal_middle.png"),
+          nearestImage(terrainRoot .. "terrain_grass_horizontal_right.png"),
+        },
+      },
+      desert = {
+        background = nearestImage(backgroundRoot .. "background_color_desert.png"),
+        ground = {
+          nearestImage(terrainRoot .. "terrain_sand_horizontal_left.png"),
+          nearestImage(terrainRoot .. "terrain_sand_horizontal_middle.png"),
+          nearestImage(terrainRoot .. "terrain_sand_horizontal_right.png"),
+        },
+      },
+      mushrooms = {
+        background = nearestImage(backgroundRoot .. "background_color_mushrooms.png"),
+        ground = {
+          nearestImage(terrainRoot .. "terrain_purple_horizontal_left.png"),
+          nearestImage(terrainRoot .. "terrain_purple_horizontal_middle.png"),
+          nearestImage(terrainRoot .. "terrain_purple_horizontal_right.png"),
+        },
+      },
+    },
+    hit = nearestImage(root .. "effects/hit.png"),
+  }
+end
+
+function Draw.loadInputPromptsController()
+  return nearestImage("assets/kenney-input-prompts/controller_generic.png")
+end
+
+function Draw.kenneyActor(assets, name, x, feetY, clock, impact, facing, lift)
+  impact = Draw.clamp(impact or 0)
+  local frames = assets.actors[name or "snail"] or assets.actors.snail
+  local frame = frames[math.floor((clock or 0) * 4) % #frames + 1]
+  local width, height = frame:getDimensions()
+  facing = facing or 1
+  local scale = 1.42
+  Draw.setColor({ 1, 1, 1, 1 })
+  love.graphics.push()
+  love.graphics.translate(x, feetY - (lift or 0))
+  love.graphics.rotate(impact * 0.08)
+  love.graphics.scale(facing * scale * (1 + impact * 0.08), scale * (1 - impact * 0.1))
+  love.graphics.draw(frame, 0, 0, 0, 1, 1, width / 2, height)
+  love.graphics.pop()
+end
+
+function Draw.kenneyArena(assets, x, y, w, h, state)
+  state = state or {}
+  local impact = Draw.clamp(state.impact or 0)
+  local attack = Draw.clamp(state.attack or impact)
+  local clock = state.time or 0
+  local theme = assets.themes[state.background or "hills"] or assets.themes.hills
+  local playerFacing = state.playerFacing or -1
+  local enemyFacing = state.enemyFacing or 1
+  local playerLift = state.playerLift or 0
+  local enemyLift = state.enemyLift or 0
+
+  love.graphics.push()
+  love.graphics.setScissor(x, y, w, h)
+  Draw.setColor({ 1, 1, 1, 1 })
+  local backgroundWidth, backgroundHeight = theme.background:getDimensions()
+  local backgroundScale = h / backgroundHeight
+  for backgroundX = x, x + w, backgroundWidth * backgroundScale do
+    love.graphics.draw(theme.background, backgroundX, y, 0, backgroundScale, backgroundScale)
+  end
+
+  local tileWidth, tileHeight = theme.ground[2]:getDimensions()
+  local groundY = y + h - tileHeight
+  love.graphics.draw(theme.ground[1], x, groundY)
+  for tileX = x + tileWidth, x + w - tileWidth, tileWidth do
+    love.graphics.draw(theme.ground[2], tileX, groundY)
+  end
+  love.graphics.draw(theme.ground[3], x + w - tileWidth, groundY)
+
+  local playerX = state.playerX or (x + w * 0.39 + attack * 76)
+  local enemyX = x + w * 0.61 + impact * 12
+  local feetY = groundY + 10
+  if not state.hidePlayer then
+    Draw.kenneyActor(assets, state.player or "mouse", playerX, feetY, clock, attack * 0.12, playerFacing, playerLift)
+  end
+
+  if not state.hideEnemy then
+    Draw.kenneyActor(assets, state.enemy or "snail", enemyX, feetY, clock, impact, enemyFacing, enemyLift)
+  end
+
+  if impact > 0.04 then
+    local contactX = enemyX - 48
+    local contactY = feetY - 42 - enemyLift
+    local hitWidth, hitHeight = assets.hit:getDimensions()
+    Draw.setColor({ 1, 1, 1, 1 }, impact)
+    local hitScale = 0.6 + impact * 0.52
+    love.graphics.draw(assets.hit, contactX, contactY, impact * 0.5, hitScale, hitScale, hitWidth / 2, hitHeight / 2)
+    Draw.setColor({ 1, 1, 1, 1 }, impact * 0.84)
+    love.graphics.draw(assets.hit, contactX - 34, contactY + 25, -impact * 0.35, hitScale * 0.42, hitScale * 0.42, hitWidth / 2, hitHeight / 2)
+  end
+  love.graphics.setScissor()
+  love.graphics.pop()
+  return enemyX, feetY
 end
 
 return Draw

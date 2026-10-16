@@ -8,6 +8,11 @@ local HEIGHT = tonumber(os.getenv("HEIGHT")) or 540
 local FPS = tonumber(os.getenv("FPS")) or 18
 local TEMP_ROOT = os.getenv("DOC_GIFS_TMP") or "/tmp/feel-doc-gifs"
 local ASSET_DIR = "docs/assets/feature-gifs"
+local CROP_X = math.floor(WIDTH * 74 / 960 + 0.5)
+local CROP_Y = math.floor(HEIGHT * 132 / 540 + 0.5)
+local CROP_W = WIDTH - CROP_X * 2
+local CROP_H = HEIGHT - CROP_Y - math.floor(HEIGHT * 30 / 540 + 0.5)
+local CROP_FILTER = string.format("crop=%d:%d:%d:%d", CROP_W, CROP_H, CROP_X, CROP_Y)
 
 local function shellQuote(value)
   return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
@@ -144,7 +149,7 @@ local function encodeGif(ffmpegBin, target, frameDir)
     "-framerate", tostring(FPS),
     "-start_number", "1",
     "-i", shellQuote(pattern),
-    "-vf", shellQuote("palettegen=stats_mode=full"),
+    "-vf", shellQuote(CROP_FILTER .. ",palettegen=stats_mode=full"),
     "-map_metadata", "-1",
     "-bitexact",
     shellQuote(palette),
@@ -159,7 +164,7 @@ local function encodeGif(ffmpegBin, target, frameDir)
     "-start_number", "1",
     "-i", shellQuote(pattern),
     "-i", shellQuote(palette),
-    "-lavfi", shellQuote("paletteuse=dither=bayer:bayer_scale=1"),
+    "-lavfi", shellQuote("[0:v]" .. CROP_FILTER .. "[scene];[scene][1:v]paletteuse=dither=bayer:bayer_scale=1"),
     "-loop", "0",
     "-map_metadata", "-1",
     "-bitexact",

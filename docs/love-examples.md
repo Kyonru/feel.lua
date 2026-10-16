@@ -4,10 +4,6 @@ icon: lucide/play
 
 # LOVE Examples
 
-<!-- feel:feature-gif love2d -->
-![Animated GIF showing Feel.lua driving a compact LOVE2D mini-scene.](assets/feature-gifs/love2d.gif)
-<!-- /feel:feature-gif love2d -->
-
 Run the showcase from the repository root:
 
 ```sh
